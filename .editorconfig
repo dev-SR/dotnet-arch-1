@@ -1,0 +1,45 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+indent_size = 4
+indent_style = space
+
+# Constants must be PascalCase
+dotnet_naming_symbols.constants.applicable_kinds = field, local
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_style.constant_style.capitalization = pascal_case
+dotnet_naming_rule.constants_should_be_pascal_case.severity = warning
+dotnet_naming_rule.constants_should_be_pascal_case.symbols = constants
+dotnet_naming_rule.constants_should_be_pascal_case.style = constant_style
+
+# Async methods should end in Async (suggestion — handlers often skip this)
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.applicable_accessibilities = *
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_style.end_in_async.required_suffix = Async
+dotnet_naming_style.end_in_async.capitalization = pascal_case
+dotnet_naming_rule.async_methods_end_in_async.severity = suggestion
+dotnet_naming_rule.async_methods_end_in_async.symbols = async_methods
+dotnet_naming_rule.async_methods_end_in_async.style = end_in_async
+
+# Analyzer severity overrides (also silenced via NoWarn in Directory.Build.props)
+# CA1303: do not pass literals as localized parameters
+dotnet_diagnostic.CA1303.severity = none
+# CA1822: mark members as static
+dotnet_diagnostic.CA1822.severity = none
+# CA2007: ConfigureAwait
+dotnet_diagnostic.CA2007.severity = none
+# Required for CLI / EnforceCodeStyleInBuild — naming-rule .severity is IDE-only
+dotnet_diagnostic.IDE1006.severity = warn
+# Style preferences
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion

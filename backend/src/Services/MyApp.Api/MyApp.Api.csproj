@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>MyApp</RootNamespace>
+        <AssemblyName>MyApp.Api</AssemblyName>
+        <IsPackable>false</IsPackable>
+        <UserSecretsId>ecomapi-local-dev</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- OpenAPI + Scalar -->
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+        <PackageReference Include="Scalar.AspNetCore" />
+
+        <!-- EF Core 10 + SQLite -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+
+        <!-- Validation -->
+        <PackageReference Include="FluentValidation.AspNetCore" />
+
+        <!-- API Versioning -->
+        <PackageReference Include="Asp.Versioning.Mvc" />
+        <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+
+        <!-- Carter (module-based endpoint registration) -->
+        <PackageReference Include="Carter" />
+
+        <!-- Dynamic Linq for sorting -->
+        <PackageReference Include="System.Linq.Dynamic.Core" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Shared\Mediator\Mediator.csproj" />
+    </ItemGroup>
+
+</Project>
