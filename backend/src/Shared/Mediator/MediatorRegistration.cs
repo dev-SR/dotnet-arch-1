@@ -1,4 +1,4 @@
-// Dispatcher/DispatcherRegistration.cs
+// MediatorRegistration.cs
 
 using System.Collections.Frozen;
 using System.Reflection;

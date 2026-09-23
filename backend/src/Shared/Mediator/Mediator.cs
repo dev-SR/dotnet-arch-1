@@ -1,4 +1,4 @@
-// Dispatcher/Dispatcher.cs
+// Mediator.cs
 namespace Mediator;
 
 internal sealed class Mediator(

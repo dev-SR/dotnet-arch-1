@@ -1,4 +1,4 @@
-// Dispatcher/RequestHandlerWrapper.cs
+// RequestHandlerWrapper.cs
 
 using Microsoft.Extensions.DependencyInjection;
 
