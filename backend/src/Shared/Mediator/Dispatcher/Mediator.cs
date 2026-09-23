@@ -1,9 +1,9 @@
 // Dispatcher/Dispatcher.cs
 namespace Mediator;
 
-internal sealed class Dispatcher(
+internal sealed class Mediator(
     IServiceProvider provider,
-    DispatcherRegistry registry) : IMediator
+    MediatorRegistry registry) : IMediator
 {
     public ValueTask<TResponse> Send<TResponse>(
         IRequest<TResponse> request,
