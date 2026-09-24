@@ -37,6 +37,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\Shared\Mediator\Mediator.csproj" />
+      <ProjectReference Include="..\..\Shared\Application\Shared.Application.csproj" />
     </ItemGroup>
 
 </Project>

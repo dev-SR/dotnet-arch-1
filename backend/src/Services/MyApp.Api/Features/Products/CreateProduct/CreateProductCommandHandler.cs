@@ -9,25 +9,33 @@ internal sealed class CreateProductCommandHandler(
     ILogger<CreateProductCommandHandler> logger)
     : IRequestHandler<CreateProductCommand, Guid>
 {
-    public async ValueTask<Guid> Handle(
+    public ValueTask<Guid> Handle(
         CreateProductCommand command,
         CancellationToken cancellationToken)
     {
-        var product = new Product
+        try
         {
-            Id = Guid.NewGuid(),
-            Name = command.Name,
-            Category = command.Category,
-            Price = command.Price,
-            Stock = command.Stock,
-            CreatedAt = DateTime.UtcNow
-        };
-        dbContext.Products.Add(product);
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = command.Name,
+                Category = command.Category,
+                Price = command.Price,
+                Stock = command.Stock,
+                CreatedAt = DateTime.UtcNow
+            };
+            dbContext.Products.Add(product);
 
-        // SaveChanges is now handled directly inside the command handler
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        logger.LogInformation("Product {ProductId} created", product.Id);
-        return product.Id;
+            // SaveChanges is now handled directly inside the command handler
+            // await dbContext.SaveChangesAsync(cancellationToken);
+            // SaveChanges is handled by TransactionBehavior
+            // No need to call it here
+            logger.LogInformation("Product {ProductId} created", product.Id);
+            return ValueTask.FromResult(product.Id);
+        }
+        catch (Exception exception)
+        {
+            return ValueTask.FromException<Guid>(exception);
+        }
     }
 }

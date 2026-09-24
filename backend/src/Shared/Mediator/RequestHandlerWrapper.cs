@@ -25,6 +25,16 @@ internal sealed class RequestHandlerWrapper<TRequest, TResponse> : RequestHandle
         var typed = (TRequest)request;
         // Resolve handler from DI and invoke directly
         var handler = provider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
-        return handler.Handle(typed, cancellationToken);
+        var behaviors = provider.GetServices<IPipelineBehavior<TRequest, TResponse>>();
+        // Build the pipeline: handler at the core, behaviors wrapped outside.
+        // Iterating in reverse means the first registered behavior runs outermost.
+        RequestHandlerDelegate<TResponse> pipeline = ct => handler.Handle(typed, ct);
+        foreach (var behavior in behaviors.Reverse())
+        {
+            var next = pipeline;
+            var current = behavior;
+            pipeline = ct => current.Handle(typed, next, ct);
+        }
+        return pipeline(cancellationToken);
     }
 }

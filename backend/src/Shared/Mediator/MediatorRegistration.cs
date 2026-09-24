@@ -8,7 +8,7 @@ namespace Mediator;
 
 public static class MediatorRegistration
 {
-    public static void AddDispatcher(this IServiceCollection services,
+    public static void RegisterRequestHandlers(this IServiceCollection services,
         params Assembly[] assemblies)
     {
         var requestWrappers = new Dictionary<Type, RequestHandlerBase>();
