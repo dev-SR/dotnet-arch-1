@@ -9,7 +9,11 @@
   <Folder Name="/src/Shared/Application/">
     <Project Path="src/Shared/Application/Shared.Application.csproj" />
   </Folder>
+  <Folder Name="/src/Shared/Common/">
+    <Project Path="src/Shared/Common/Shared.Common.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MyApp.Tests.Integration/MyApp.Tests.Integration.csproj" />
+    <Project Path="tests/MyApp.Tests.Unit/MyApp.Tests.Unit.csproj" />
   </Folder>
 </Solution>

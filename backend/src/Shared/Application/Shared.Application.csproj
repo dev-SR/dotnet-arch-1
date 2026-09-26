@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Mediator\Mediator.csproj" />
+    <ProjectReference Include="..\Common\Shared.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>

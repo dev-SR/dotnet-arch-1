@@ -1,3 +1,9 @@
 global using Mediator;
 global using Carter;
 global using Microsoft.Extensions.DependencyInjection;
+global using Shared.Application.Abstractions.Queries;
+global using Shared.Application.Behaviors;
+global using Shared.Application.Abstractions.Commands;
+global using Shared.Common.Errors;
+global using Shared.Common.Errors.Http;
+global using Shared.Common.Exceptions.Http;

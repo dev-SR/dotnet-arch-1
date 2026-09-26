@@ -1,4 +1,5 @@
 using Scalar.AspNetCore;
+using Shared.Common.Exceptions.Http;
 
 namespace MyApp.Presentation;
 
@@ -8,6 +9,9 @@ public static class WebApplicationExtensions
     {
         public void UsePresentation()
         {
+            // Before endpoints — shared handler from Shared.Common
+            app.UseSharedExceptionHandling();
+
             app.MapApiRoutes();
             app.MapApiDocumentation();
         }

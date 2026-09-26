@@ -1,21 +1,19 @@
+using Microsoft.EntityFrameworkCore;
 using MyApp.Persistence;
+using Shared.Common.Errors;
 
 namespace MyApp.Features.Products.GetProducts;
 
-// Features/Products/GetProducts/GetProductsQueryHandler.cs
-using Microsoft.EntityFrameworkCore;
-
-
 internal sealed class GetProductsQueryHandler(AppDbContext dbContext)
-    : IRequestHandler<GetProductsQuery, List<ProductDto>>
+    : IRequestHandler<GetProductsQuery, ErrorOr<List<ProductDto>>>
 {
-    public async ValueTask<List<ProductDto>> Handle(
+    public async ValueTask<ErrorOr<List<ProductDto>>> Handle(
         GetProductsQuery query,
         CancellationToken cancellationToken)
     {
-        return await dbContext.Products
+        var products = await dbContext.Products
             .AsNoTracking()
-            .OrderByDescending(p => p.CreatedAt) // Newest first
+            .OrderByDescending(p => p.CreatedAt)
             .Select(p => new ProductDto(
                 p.Id,
                 p.Name,
@@ -23,5 +21,7 @@ internal sealed class GetProductsQueryHandler(AppDbContext dbContext)
                 p.Price,
                 p.Stock))
             .ToListAsync(cancellationToken);
+
+        return products;
     }
 }

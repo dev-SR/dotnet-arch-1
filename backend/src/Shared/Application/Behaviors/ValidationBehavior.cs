@@ -1,10 +1,13 @@
 using FluentValidation;
 using Mediator;
+using Microsoft.Extensions.Logging;
+using Shared.Common.Errors;
 
 namespace Shared.Application.Behaviors;
 
 public sealed class ValidationBehavior<TRequest, TResponse>(
-    IEnumerable<IValidator<TRequest>> validators)
+    IEnumerable<IValidator<TRequest>> validators,
+    ILogger<ValidationBehavior<TRequest, TResponse>> logger)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
@@ -13,17 +16,27 @@ public sealed class ValidationBehavior<TRequest, TResponse>(
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
-        if (!validators.Any())
+        var list = validators as IValidator<TRequest>[] ?? validators.ToArray();
+        if (list.Length == 0)
             return await next(cancellationToken);
-        var context = new ValidationContext<TRequest>(request);
-        var validationResults = await Task.WhenAll(
-            validators.Select(v => v.ValidateAsync(context, cancellationToken)));
-        var failures = validationResults
+
+        var failures = (await Task.WhenAll(list.Select(v => v.ValidateAsync(request, cancellationToken))))
             .SelectMany(r => r.Errors)
-            .Where(f => f is not null)
             .ToList();
-        if (failures.Count != 0)
-            throw new ValidationException(failures);
-        return await next(cancellationToken);
+
+        if (failures.Count == 0)
+            return await next(cancellationToken);
+
+        logger.LogWarning(
+            "Validation failed for {Request}: {Count} error(s)",
+            typeof(TRequest).Name,
+            failures.Count);
+
+        var errors = failures
+            .Select(f => Error.ValidationField(f.PropertyName, f.ErrorMessage))
+            .ToList();
+
+        // TResponse is ErrorOr<T> at runtime; open-generic DI can't express that in the signature.
+        return ErrorOrFactory.Failure<TResponse>(errors);
     }
 }

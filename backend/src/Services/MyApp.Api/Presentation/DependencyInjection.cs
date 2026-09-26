@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Microsoft.OpenApi;
+using Shared.Common.Exceptions.Http;
 
 namespace MyApp.Presentation;
 //The API layer registers HTTP-specific concerns: authentication, authorization, CORS, Swagger, and middleware.
@@ -18,7 +19,7 @@ public static class ApiServiceCollectionExtensions
                 .AddOpenApiDocumentation()
                 .AddApiVersioningSupport()
                 .AddHealthChecks(configuration)
-                .AddProblemDetails();
+                .AddSharedExceptionHandling();
 
             return services;
         }

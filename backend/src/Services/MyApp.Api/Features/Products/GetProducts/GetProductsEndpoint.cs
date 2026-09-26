@@ -1,9 +1,5 @@
 
-using Microsoft.AspNetCore.Http.HttpResults;
-
 namespace MyApp.Features.Products.GetProducts;
-
-// Features/Products/GetProducts/GetProductsEndpoint.cs
 
 public class GetProductsEndpoint : ICarterModule
 {
@@ -15,11 +11,12 @@ public class GetProductsEndpoint : ICarterModule
             .Produces<List<ProductDto>>(StatusCodes.Status200OK);
     }
 
-    private async Task<Ok<List<ProductDto>>> HandleAsync(
+    private static async Task<IResult> HandleAsync(
         IMediator mediator,
+        HttpContext http,
         CancellationToken ct)
     {
-        var products = await mediator.Send(new GetProductsQuery(), ct);
-        return TypedResults.Ok(products);
+        var result = await mediator.Send(new GetProductsQuery(), ct);
+        return result.MatchOk(http);
     }
 }

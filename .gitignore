@@ -106,3 +106,8 @@ prompt
 
 # Keep agent skills in-repo; ignore local skill caches if any
 .agents/**/.cache/
+
+# ----- Testing --------------
+
+**/TestResults/
+**/coverage-report/

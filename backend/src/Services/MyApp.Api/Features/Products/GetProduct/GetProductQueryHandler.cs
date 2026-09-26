@@ -1,14 +1,14 @@
-// Features/Products/GetProduct/GetProductQueryHandler.
 using Microsoft.EntityFrameworkCore;
 using MyApp.Persistence;
+using Shared.Common.Errors;
 
 namespace MyApp.Features.Products.GetProduct;
 
 internal sealed class GetProductQueryHandler(
     AppDbContext dbContext)
-    : IRequestHandler<GetProductQuery, ProductDto?>
+    : IRequestHandler<GetProductQuery, ErrorOr<ProductDto>>
 {
-    public async ValueTask<ProductDto?> Handle(
+    public async ValueTask<ErrorOr<ProductDto>> Handle(
         GetProductQuery query,
         CancellationToken cancellationToken)
     {
@@ -16,13 +16,18 @@ internal sealed class GetProductQueryHandler(
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == query.Id, cancellationToken);
 
-        return product is null
-            ? null
-            : new ProductDto(
-                product.Id,
-                product.Name,
-                product.Category,
-                product.Price,
-                product.Stock);
+        if (product is null)
+        {
+            return Error.NotFound(
+                "PRODUCT.NOT_FOUND",
+                $"Product '{query.Id}' was not found.");
+        }
+
+        return new ProductDto(
+            product.Id,
+            product.Name,
+            product.Category,
+            product.Price,
+            product.Stock);
     }
 }

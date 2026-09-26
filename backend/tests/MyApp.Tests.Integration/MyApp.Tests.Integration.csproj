@@ -5,25 +5,29 @@
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
-        <RootNamespace>EcomApi.Tests.Integration</RootNamespace>
-        <AssemblyName>EcomApi.Tests.Integration</AssemblyName>
+        <RootNamespace>MyApp.Tests.Integration</RootNamespace>
+        <AssemblyName>MyApp.Tests.Integration</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.NET.Test.Sdk"/>
-        <PackageReference Include="xunit"/>
-        <PackageReference Include="xunit.runner.visualstudio"/>
-        <PackageReference Include="FluentAssertions"/>
-        <PackageReference Include="NSubstitute"/>
-        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory"/>
+        <PackageReference Include="coverlet.collector">
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio" />
+        <PackageReference Include="FluentAssertions" />
+        <PackageReference Include="NSubstitute" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Xunit"/>
+        <Using Include="Xunit" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Services\MyApp.Api\MyApp.Api.csproj"/>
+        <ProjectReference Include="..\..\src\Services\MyApp.Api\MyApp.Api.csproj" />
     </ItemGroup>
 </Project>

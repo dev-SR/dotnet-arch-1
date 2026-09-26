@@ -15,3 +15,5 @@ app.UseInfrastructure()
     .UsePresentation();
 
 app.Run();
+
+public partial class Program;
