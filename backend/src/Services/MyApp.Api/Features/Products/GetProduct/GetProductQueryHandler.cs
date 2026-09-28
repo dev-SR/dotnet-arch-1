@@ -13,7 +13,7 @@ internal sealed class GetProductQueryHandler(
         CancellationToken cancellationToken)
     {
         var product = await dbContext.Products
-            .AsNoTracking()
+            .AsNoTracking().Include(product => product.Category)
             .FirstOrDefaultAsync(p => p.Id == query.Id, cancellationToken);
 
         if (product is null)
@@ -26,8 +26,9 @@ internal sealed class GetProductQueryHandler(
         return new ProductDto(
             product.Id,
             product.Name,
-            product.Category,
+            Category: product.Category.Name,
             product.Price,
-            product.Stock);
+            product.Stock
+        );
     }
 }

@@ -10,6 +10,7 @@
 
     <ItemGroup>
         <!-- OpenAPI + Scalar -->
+        <PackageReference Include="Bogus" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Scalar.AspNetCore" />
 
@@ -40,5 +41,6 @@
       <ProjectReference Include="..\..\Shared\Application\Shared.Application.csproj" />
       <ProjectReference Include="..\..\Shared\Common\Shared.Common.csproj" />
     </ItemGroup>
+
 
 </Project>

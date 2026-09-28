@@ -1,4 +1,3 @@
-
 namespace MyApp.Features.Products.GetProducts;
 
 public class GetProductsEndpoint : ICarterModule
@@ -8,15 +7,17 @@ public class GetProductsEndpoint : ICarterModule
         app.MapGet("/products", HandleAsync)
             .WithName("GetProducts")
             .WithTags("Products")
-            .Produces<List<ProductDto>>(StatusCodes.Status200OK);
+            .Produces<List<ProductListItemDto>>(StatusCodes.Status200OK);
     }
 
     private static async Task<IResult> HandleAsync(
+        [AsParameters]
+        ProductFilter filter,
         IMediator mediator,
         HttpContext http,
         CancellationToken ct)
     {
-        var result = await mediator.Send(new GetProductsQuery(), ct);
+        var result = await mediator.Send(new GetProductsQuery(filter), ct);
         return result.MatchOk(http);
     }
 }

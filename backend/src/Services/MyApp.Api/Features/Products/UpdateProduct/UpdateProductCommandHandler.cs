@@ -12,7 +12,7 @@ internal sealed class UpdateProductCommandHandler(
         UpdateProductCommand command,
         CancellationToken cancellationToken)
     {
-        var product = await dbContext.Products
+        var product = await dbContext.Products.Include(product => product.Category)
             .FirstOrDefaultAsync(p => p.Id == command.Id, cancellationToken);
 
         if (product is null)
@@ -23,7 +23,7 @@ internal sealed class UpdateProductCommandHandler(
         }
 
         product.Name = command.Name;
-        product.Category = command.Category;
+        product.Category.Name = command.Category;
         product.Price = command.Price;
         product.Stock = command.Stock;
 

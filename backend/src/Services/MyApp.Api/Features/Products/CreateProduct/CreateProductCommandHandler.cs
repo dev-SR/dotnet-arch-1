@@ -1,3 +1,4 @@
+using MyApp.Features.Categories;
 using MyApp.Persistence;
 using Shared.Common.Errors;
 
@@ -16,10 +17,13 @@ internal sealed class CreateProductCommandHandler(
         {
             Id = Guid.NewGuid(),
             Name = command.Name,
-            Category = command.Category,
             Price = command.Price,
             Stock = command.Stock,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Category =
+            {
+                Name = command.Category
+            }
         };
         dbContext.Products.Add(product);
 

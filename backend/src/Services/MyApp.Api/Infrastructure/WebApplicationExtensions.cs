@@ -1,8 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using MyApp.Persistence;
+using MyApp.Persistence.Seeding;
 
 namespace MyApp.Infrastructure;
 
-// Extensions/InfrastructureApplicationBuilderExtensions.cs
 public static class WebApplicationExtensions
 {
     public static WebApplication UseInfrastructure(this WebApplication app)
@@ -10,8 +11,10 @@ public static class WebApplicationExtensions
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        // Runs synchronously during the app build phase
-        db.Database.EnsureCreated();
+        db.Database.Migrate();
+
+        if (app.Environment.IsDevelopment())
+            DataSeeder.SeedAsync(db).GetAwaiter().GetResult();
 
         return app;
     }
