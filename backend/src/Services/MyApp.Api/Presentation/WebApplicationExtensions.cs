@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Scalar.AspNetCore;
 using Shared.Common.Exceptions.Http;
 
@@ -5,31 +6,27 @@ namespace MyApp.Presentation;
 
 public static class WebApplicationExtensions
 {
-    extension(WebApplication app)
+    public static WebApplication UsePresentation(this WebApplication app)
     {
-        public void UsePresentation()
-        {
-            // Before endpoints — shared handler from Shared.Common
-            app.UseSharedExceptionHandling();
+        app.UseSharedExceptionHandling();
+        app.UseForwardedHeaders();
+        app.UseCors(app.Environment.IsDevelopment() ? "Development" : "Production");
+        app.UseRateLimiter();
+        app.UseAuthentication();
+        app.UseAuthorization();
 
-            app.MapApiRoutes();
-            app.MapApiDocumentation();
+        app.MapCarter();
+        app.MapHealthChecks("/health").AllowAnonymous();
+
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapOpenApi().AllowAnonymous();
+            app.MapScalarApiReference(options =>
+            {
+                options.EnablePersistentAuthentication();
+            }).AllowAnonymous();
         }
 
-        private void MapApiRoutes()
-        {
-            // 1. Map all Carter REPR Endpoints
-            app.MapCarter();
-
-            // 2. Map Health Checks
-            app.MapHealthChecks("/health");
-        }
-
-        private void MapApiDocumentation()
-        {
-            if (!app.Environment.IsDevelopment()) return;
-            app.MapOpenApi();
-            app.MapScalarApiReference(); // Scalar is the modern alternative to Swagger UI
-        }
+        return app;
     }
 }

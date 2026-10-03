@@ -1,11 +1,12 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;
+using MyApp.Features.Auth;
 using Shared.Common.Exceptions.Http;
 
 namespace MyApp.Presentation;
-//The API layer registers HTTP-specific concerns: authentication, authorization, CORS, Swagger, and middleware.
 
-// src/MyApp.Api/DependencyInjection.cs
 public static class ApiServiceCollectionExtensions
 {
     extension(IServiceCollection services)
@@ -14,7 +15,9 @@ public static class ApiServiceCollectionExtensions
         {
             services
                 .AddCarter()
-                .AddAuthenticationAndAuthorization(configuration)
+                .AddJwtAuthentication()
+                .AddAuthorizationPolicies()
+                .AddApiRateLimiting()
                 .AddCorsPolicies(configuration)
                 .AddOpenApiDocumentation()
                 .AddApiVersioningSupport()
@@ -24,8 +27,26 @@ public static class ApiServiceCollectionExtensions
             return services;
         }
 
-        private IServiceCollection AddAuthenticationAndAuthorization(IConfiguration configuration)
+
+        private IServiceCollection AddJwtAuthentication()
         {
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(); // options come from ConfigureJwtBearer
+
+            services.ConfigureOptions<ConfigureJwtBearer>();
+            return services;
+        }
+
+        private IServiceCollection AddAuthorizationPolicies()
+        {
+            services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+
+                options.AddPolicy(Policies.AdminOnly, p => p.RequireRole(Roles.Admin));
+            });
 
             return services;
         }
@@ -34,7 +55,7 @@ public static class ApiServiceCollectionExtensions
         {
             var allowedOrigins = configuration
                 .GetSection("Cors:AllowedOrigins")
-                .Get<string[]>() ?? Array.Empty<string>();
+                .Get<string[]>() ?? [];
             services.AddCors(options =>
             {
                 options.AddPolicy("Production", policy =>
@@ -54,8 +75,7 @@ public static class ApiServiceCollectionExtensions
         {
             services.AddOpenApi(options =>
             {
-                options.OpenApiVersion = Microsoft.OpenApi.OpenApiSpecVersion.OpenApi3_1;
-                // Add document transformer for info
+                options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
                 options.AddDocumentTransformer((document, context, cancellationToken) =>
                 {
                     document.Info = new OpenApiInfo
@@ -63,25 +83,25 @@ public static class ApiServiceCollectionExtensions
                         Title = "MyApp API",
                         Version = "v1",
                         Description = "Production API for MyApp",
-                        Contact = new OpenApiContact
-                        {
-                            Name = "API Support",
-                            Email = "api@myapp.com"
-                        }
                     };
+                    document.AddAuthSecuritySchemes();
                     return Task.CompletedTask;
                 });
-                // Add security scheme
-                options.AddDocumentTransformer((document, context, cancellationToken) =>
+                options.AddOperationTransformer((operation, context, cancellationToken) =>
                 {
-                    document.Components ??= new OpenApiComponents();
-                    document.Components.SecuritySchemes?.Add("Bearer", new OpenApiSecurityScheme
+                    var allowAnonymous = context.Description.ActionDescriptor.EndpointMetadata
+                        .OfType<IAllowAnonymous>().Any();
+                    if (!allowAnonymous)
                     {
-                        Type = SecuritySchemeType.Http,
-                        Scheme = "Bearer",
-                        BearerFormat = "JWT",
-                        Description = "Enter your JWT token"
-                    });
+                        operation.Security =
+                        [
+                            new OpenApiSecurityRequirement
+                            {
+                                [new OpenApiSecuritySchemeReference("Bearer")] = [],
+                            },
+                        ];
+                    }
+
                     return Task.CompletedTask;
                 });
             });
@@ -108,12 +128,6 @@ public static class ApiServiceCollectionExtensions
         private IServiceCollection AddHealthChecks(IConfiguration configuration)
         {
             services.AddHealthChecks();
-            // .AddDbContextCheck<AppDbContext>()
-            // .AddRedis("Redis", tags: new[] { "cache" })
-            // .AddUrlGroup(
-            //     new Uri(configuration["ExternalApis:PaymentGateway:HealthUrl"]!),
-            //     name: "payment-gateway",
-            //     tags: new[] { "external" });
             return services;
         }
     }

@@ -1,47 +1,61 @@
 using Microsoft.EntityFrameworkCore;
+using Shared.Application.Abstractions.Commands;
+using Shared.Common.Errors;
 
 namespace MyApp.Persistence;
 
-/// <summary>
-/// Demo Unit-of-Work wrapper. Optional in real projects — keep or drop per service needs.
-/// On failure it rolls back and rethrows; no special concurrency type is introduced.
-/// </summary>
 public sealed class TransactionBehavior<TRequest, TResponse>(
-    AppDbContext dbContext,
+    AppDbContext db,
     ILogger<TransactionBehavior<TRequest, TResponse>> logger)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
+    private static readonly bool IsCommand = typeof(ICommandMarker).IsAssignableFrom(typeof(TRequest));
+    private static readonly bool PersistOnFailure = typeof(IPersistOnFailure).IsAssignableFrom(typeof(TRequest));
+
     public async ValueTask<TResponse> Handle(
-        TRequest request,
-        RequestHandlerDelegate<TResponse> next,
-        CancellationToken cancellationToken)
+        TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
     {
-        if (typeof(TRequest).Name.EndsWith("Query", StringComparison.Ordinal))
-            return await next(cancellationToken);
+        if (!IsCommand || db.Database.CurrentTransaction is not null)
+            return await next(ct);
 
-        // InMemory (tests) and some providers don't support user transactions.
-        if (!dbContext.Database.IsRelational())
-        {
-            var response = await next(cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return response;
-        }
-
-        await using var transaction = await dbContext.Database
-            .BeginTransactionAsync(cancellationToken);
         try
         {
-            var response = await next(cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return response;
+            if (!db.Database.IsRelational())
+            {
+                var r = await next(ct);
+                if (ShouldCommit(r)) await db.SaveChangesAsync(ct);
+                return r;
+            }
+
+            var strategy = db.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                db.ChangeTracker.Clear();
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+                var response = await next(ct);
+
+                if (!ShouldCommit(response))
+                {
+                    await tx.RollbackAsync(ct);
+                    db.ChangeTracker.Clear();
+                    return response;
+                }
+
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+                return response;
+            });
         }
-        catch (Exception ex)
+        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
         {
-            await transaction.RollbackAsync(cancellationToken);
-            logger.LogWarning(ex, "Transaction rolled back for {Request}", typeof(TRequest).Name);
-            throw;
+            logger.LogWarning(ex, "Unique constraint hit in {Request}", typeof(TRequest).Name);
+            return ErrorOrFactory.Failure<TResponse>(
+                [Error.Conflict("DB.CONFLICT", "The resource already exists or was changed by another request.")]);
         }
     }
+
+    private static bool ShouldCommit(TResponse response) =>
+        PersistOnFailure || response is not IErrorOr { IsError: true };
 }

@@ -1,3 +1,4 @@
+using MyApp.Features.Brands;
 using MyApp.Features.Categories;
 using MyApp.Persistence;
 using Shared.Common.Errors;
@@ -20,10 +21,8 @@ internal sealed class CreateProductCommandHandler(
             Price = command.Price,
             Stock = command.Stock,
             CreatedAt = DateTime.UtcNow,
-            Category =
-            {
-                Name = command.Category
-            }
+            Category = new Category { Name = command.Category },
+            Brand = new Brand { Name = "Generic" },
         };
         dbContext.Products.Add(product);
 

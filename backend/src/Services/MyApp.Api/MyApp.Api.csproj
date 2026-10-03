@@ -11,6 +11,8 @@
     <ItemGroup>
         <!-- OpenAPI + Scalar -->
         <PackageReference Include="Bogus" />
+        <PackageReference Include="DotNetEnv" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Scalar.AspNetCore" />
 

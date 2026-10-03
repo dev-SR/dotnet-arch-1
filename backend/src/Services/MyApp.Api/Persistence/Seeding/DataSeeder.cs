@@ -1,5 +1,9 @@
 using Bogus;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MyApp.Config;
+using MyApp.Features.Auth;
 using MyApp.Features.Brands;
 using MyApp.Features.Categories;
 using MyApp.Features.Customers;
@@ -7,12 +11,119 @@ using MyApp.Features.Orders;
 using MyApp.Features.Products;
 using MyApp.Features.Reviews;
 using MyApp.Features.Tags;
+using MyApp.Persistence.Configurations;
 
 namespace MyApp.Persistence.Seeding;
 
 public static class DataSeeder
 {
-    public static async Task SeedAsync(AppDbContext db, CancellationToken ct = default)
+public static async Task SeedAsync(
+        AppDbContext db,
+        SeedOptions options,
+        IPasswordHasher<User> passwordHasher,
+        CancellationToken ct = default)
+    {
+        await SeedAdminAsync(db, options, passwordHasher, ct);
+        await SeedUserAsync(db, options, passwordHasher, ct);
+        await SeedProductModuleAsync(db, ct);
+    }
+
+    private static async Task SeedAdminAsync(
+        AppDbContext db,
+        SeedOptions options,
+        IPasswordHasher<User> passwordHasher,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(options.AdminEmail) ||
+            string.IsNullOrWhiteSpace(options.AdminPassword))
+        {
+            return;
+        }
+
+        var email = options.AdminEmail.Trim();
+        var normalizedEmail = email.ToUpperInvariant();
+
+        var existing = await db.Users
+            .FirstOrDefaultAsync(
+                u => u.NormalizedEmail == normalizedEmail,
+                ct);
+
+        if (existing is not null)
+            return;
+
+        var user = new User
+        {
+            Email = email,
+            NormalizedEmail = normalizedEmail,
+            PasswordHash = string.Empty
+        };
+
+        user.PasswordHash = passwordHasher.HashPassword(
+            user,
+            options.AdminPassword);
+
+        db.Users.Add(user);
+
+        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id,
+            RoleId = RoleConfiguration.AdminRoleId
+        });
+
+        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id,
+            RoleId = RoleConfiguration.UserRoleId
+        });
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task SeedUserAsync(
+        AppDbContext db,
+        SeedOptions options,
+        IPasswordHasher<User> passwordHasher,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(options.UserEmail) ||
+            string.IsNullOrWhiteSpace(options.UserPassword))
+        {
+            return;
+        }
+
+        var email = options.UserEmail.Trim();
+        var normalizedEmail = email.ToUpperInvariant();
+
+        var existing = await db.Users
+            .FirstOrDefaultAsync(
+                u => u.NormalizedEmail == normalizedEmail,
+                ct);
+
+        if (existing is not null)
+            return;
+
+        var user = new User
+        {
+            Email = email,
+            NormalizedEmail = normalizedEmail,
+            PasswordHash = string.Empty
+        };
+
+        user.PasswordHash = passwordHasher.HashPassword(
+            user,
+            options.UserPassword);
+
+        db.Users.Add(user);
+
+        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id,
+            RoleId = RoleConfiguration.UserRoleId
+        });
+
+        await db.SaveChangesAsync(ct);
+    }
+    private  static async Task SeedProductModuleAsync(AppDbContext db, CancellationToken ct = default)
     {
         if (await db.Products.AnyAsync(ct)) return;   // idempotent — see the "why" above
 

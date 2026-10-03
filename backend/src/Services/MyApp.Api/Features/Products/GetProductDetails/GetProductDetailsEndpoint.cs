@@ -7,7 +7,8 @@ public sealed class GetProductDetailsEndpoint : ICarterModule
     {
         app.MapGet("/products/{id:guid}/details", HandleAsync)
             .WithName("GetProductDetails")
-            .WithTags("Products");
+            .WithTags("Products")
+            .AllowAnonymous();
     }
 
     private static async Task<IResult> HandleAsync(

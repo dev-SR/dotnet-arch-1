@@ -1,6 +1,9 @@
+using DotNetEnv;
 using MyApp.Application;
 using MyApp.Infrastructure;
 using MyApp.Presentation;
+
+Env.TraversePath().Load(); // before CreateBuilder so Jwt__* bind into IConfiguration
 
 var builder = WebApplication.CreateBuilder(args);
 

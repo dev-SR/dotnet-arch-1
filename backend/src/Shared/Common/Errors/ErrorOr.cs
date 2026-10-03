@@ -2,7 +2,13 @@ namespace Shared.Common.Errors;
 
 public readonly record struct Success;   // marker for ErrorOr<Success> void return types
 
-public readonly struct ErrorOr<TValue>
+/// <summary>Non-generic view so pipeline behaviors can detect ErrorOr failures without reflection.</summary>
+public interface IErrorOr
+{
+    bool IsError { get; }
+}
+
+public readonly struct ErrorOr<TValue> : IErrorOr
 {
     private readonly TValue? _value;
     private readonly List<Error>? _errors;
@@ -44,7 +50,7 @@ public readonly struct ErrorOr<TValue>
         Func<TValue, Task<TResult>> onValue, Func<IReadOnlyList<Error>, Task<TResult>> onError) =>
         IsError ? await onError(Errors) : await onValue(Value);
 
-    // Chbody: run `next` only on success, short-circuiting on the first failure.
+    // Then: run `next` only on success, short-circuiting on the first failure.
     // This is what lets several fallible steps compose without nested if(IsError) checks.
     public ErrorOr<TNext> Then<TNext>(Func<TValue, ErrorOr<TNext>> next) =>
         IsError ? Errors.ToList() : next(Value);

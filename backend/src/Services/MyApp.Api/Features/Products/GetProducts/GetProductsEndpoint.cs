@@ -7,6 +7,7 @@ public class GetProductsEndpoint : ICarterModule
         app.MapGet("/products", HandleAsync)
             .WithName("GetProducts")
             .WithTags("Products")
+            .AllowAnonymous()
             .Produces<List<ProductListItemDto>>(StatusCodes.Status200OK);
     }
 
