@@ -17,6 +17,7 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         b.Property(x => x.NormalizedName).HasMaxLength(64).IsRequired();
         b.HasIndex(x => x.NormalizedName).IsUnique();
         b.HasMany(x => x.UserRoles).WithOne(x => x.Role).HasForeignKey(x => x.RoleId);
+        b.HasMany(x => x.RolePermissions).WithOne(x => x.Role).HasForeignKey(x => x.RoleId);
 
         b.HasData(
             new Role { Id = UserRoleId, Name = Roles.User, NormalizedName = "USER" },

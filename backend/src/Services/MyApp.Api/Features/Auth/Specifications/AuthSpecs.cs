@@ -77,6 +77,26 @@ public sealed class UserRoleByUserAndRoleSpecification : SpecificationBase<UserR
         Where(ur => ur.UserId == userId && ur.RoleId == roleId);
 }
 
+public sealed class RolePermissionsByRoleIdsSpecification : SpecificationBase<RolePermission>
+{
+    public RolePermissionsByRoleIdsSpecification(IEnumerable<Guid> roleIds)
+    {
+        var ids = roleIds.ToArray();
+        Where(rp => ids.Contains(rp.RoleId));
+    }
+}
+
+public sealed class PermissionByNameSpecification : SpecificationBase<Permission>
+{
+    public PermissionByNameSpecification(string name) => Where(p => p.Name == name);
+}
+
+public sealed class RolePermissionByRoleAndPermissionSpecification : SpecificationBase<RolePermission>
+{
+    public RolePermissionByRoleAndPermissionSpecification(Guid roleId, Guid permissionId) =>
+        Where(rp => rp.RoleId == roleId && rp.PermissionId == permissionId);
+}
+
 // Include graphs only — no Criteria. And() with a filter above.
 
 public sealed class RefreshTokenWithUserRolesSpecification : SpecificationBase<RefreshToken>
@@ -89,4 +109,13 @@ public sealed class RefreshTokenWithUserRolesSpecification : SpecificationBase<R
     }
 
     public static readonly ISpecification<RefreshToken> Instance = new RefreshTokenWithUserRolesSpecification();
+}
+
+public sealed class RolePermissionsWithPermissionSpecification : SpecificationBase<RolePermission>
+{
+    public RolePermissionsWithPermissionSpecification() =>
+        Include(q => q.Include(rp => rp.Permission));
+
+    public static readonly ISpecification<RolePermission> Instance =
+        new RolePermissionsWithPermissionSpecification();
 }

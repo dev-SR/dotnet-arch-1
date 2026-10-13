@@ -1,8 +1,9 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;
+using MyApp.Auth.Jwt;
 using MyApp.Features.Auth;
+using MyApp.Features.Auth.Authorization;
 using Shared.Common.Exceptions.Http;
 
 namespace MyApp.Presentation;
@@ -15,7 +16,7 @@ public static class ApiServiceCollectionExtensions
         {
             services
                 .AddCarter()
-                .AddJwtAuthentication()
+                .AddJwtAuthentication(configuration)
                 .AddAuthorizationPolicies()
                 .AddApiRateLimiting()
                 .AddCorsPolicies(configuration)
@@ -28,17 +29,18 @@ public static class ApiServiceCollectionExtensions
         }
 
 
-        private IServiceCollection AddJwtAuthentication()
+        private IServiceCollection AddJwtAuthentication(IConfiguration configuration)
         {
-            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                .AddJwtBearer(); // options come from ConfigureJwtBearer
-
+            // Shared HS256 + permission policies (Hospital-style AddMyAppAuth).
+            services.AddMyAppAuth(configuration);
+            // AuthApi-only: ban / token_version checks after crypto validation.
             services.ConfigureOptions<ConfigureJwtBearer>();
             return services;
         }
 
         private IServiceCollection AddAuthorizationPolicies()
         {
+            // AddMyAppAuth already called AddAuthorization + PermissionPolicyProvider.
             services.AddAuthorization(options =>
             {
                 options.FallbackPolicy = new AuthorizationPolicyBuilder()
@@ -46,7 +48,17 @@ public static class ApiServiceCollectionExtensions
                     .Build();
 
                 options.AddPolicy(Policies.AdminOnly, p => p.RequireRole(Roles.Admin));
+
+                options.AddPolicy(Policies.WorkingHours, p =>
+                    p.Requirements.Add(new WorkingHoursRequirement(9, 18)));
+
+                options.AddPolicy(Policies.EnhancedSecurity, p =>
+                    p.Requirements.Add(new EnhancedSecurityRequirement()));
             });
+
+            services.AddSingleton<IAuthorizationHandler, WorkingHoursHandler>();
+            services.AddSingleton<IAuthorizationHandler, EnhancedSecurityHandler>();
+            services.AddSingleton<IAuthorizationHandler, ResourcePermissionHandler>();
 
             return services;
         }

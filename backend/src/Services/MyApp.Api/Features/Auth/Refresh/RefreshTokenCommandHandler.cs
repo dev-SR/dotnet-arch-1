@@ -54,8 +54,16 @@ internal sealed class RefreshTokenCommandHandler(
             return Error.Unauthorized("AUTH.INVALID_TOKEN", "Invalid refresh token.");
         }
 
-        var roles = stored.User.UserRoles.Select(ur => ur.Role.Name);
-        var issued = tokens.IssueTokens(stored.User, roles, stored.FamilyId);
+        var roles = stored.User.UserRoles.Select(ur => ur.Role.Name).ToList();
+        var roleIds = stored.User.UserRoles.Select(ur => ur.RoleId);
+        var permissions = await db.RolePermissions
+            .Apply(new RolePermissionsByRoleIdsSpecification(roleIds)
+                .And(RolePermissionsWithPermissionSpecification.Instance))
+            .Select(rp => rp.Permission.Name)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var issued = tokens.IssueTokens(stored.User, roles, permissions, stored.FamilyId);
         db.RefreshTokens.Add(issued.RefreshToken);
         return new TokenResponse(
             issued.AccessToken,

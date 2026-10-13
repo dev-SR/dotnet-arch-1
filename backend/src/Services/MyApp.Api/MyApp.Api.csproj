@@ -42,6 +42,7 @@
       <ProjectReference Include="..\..\Shared\Mediator\Mediator.csproj" />
       <ProjectReference Include="..\..\Shared\Application\Shared.Application.csproj" />
       <ProjectReference Include="..\..\Shared\Common\Shared.Common.csproj" />
+      <ProjectReference Include="..\..\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
     </ItemGroup>
 
 

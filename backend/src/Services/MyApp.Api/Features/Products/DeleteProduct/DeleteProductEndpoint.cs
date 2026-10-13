@@ -1,3 +1,4 @@
+using MyApp.Features.Auth;
 using Shared.Common.Errors.Http;
 
 namespace MyApp.Features.Products.DeleteProduct;
@@ -8,7 +9,8 @@ public sealed class DeleteProductEndpoint : ICarterModule
     {
         app.MapDelete("/products/{id:guid}", HandleAsync)
             .WithName("DeleteProduct")
-            .WithTags("Products");
+            .WithTags("Products")
+            .RequireAuthorization(Permissions.Products.Delete);
     }
 
     private static async Task<IResult> HandleAsync(

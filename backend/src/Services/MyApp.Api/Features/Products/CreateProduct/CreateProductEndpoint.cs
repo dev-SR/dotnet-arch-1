@@ -1,3 +1,5 @@
+using MyApp.Features.Auth;
+
 namespace MyApp.Features.Products.CreateProduct;
 
 public class CreateProductEndpoint : ICarterModule
@@ -6,7 +8,8 @@ public class CreateProductEndpoint : ICarterModule
     {
         app.MapPost("/products", HandleAsync)
             .WithName("CreateProduct")
-            .WithTags("Products");
+            .WithTags("Products")
+            .RequireAuthorization(Permissions.Products.Create);
     }
 
     private static async Task<IResult> HandleAsync(

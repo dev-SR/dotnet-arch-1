@@ -1,3 +1,4 @@
+using MyApp.Features.Auth;
 using Shared.Common.Errors.Http;
 
 namespace MyApp.Features.Products.UpdateProduct;
@@ -8,7 +9,8 @@ public sealed class UpdateProductEndpoint : ICarterModule
     {
         app.MapPut("/products/{id:guid}", HandleAsync)
             .WithName("UpdateProduct")
-            .WithTags("Products");
+            .WithTags("Products")
+            .RequireAuthorization(Permissions.Products.Edit);
     }
 
     private static async Task<IResult> HandleAsync(

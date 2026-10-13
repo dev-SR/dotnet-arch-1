@@ -40,6 +40,29 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
             db.SaveChanges();
         }
 
+        // EnsureCreated may already insert HasData permissions; fill gaps for older shapes.
+        if (!db.Permissions.Any())
+        {
+            db.Permissions.AddRange(PermissionConfiguration.SeedRows
+                .Select(r => new Permission { Id = r.Id, Name = r.Name }));
+            db.SaveChanges();
+        }
+
+        if (!db.RolePermissions.Any())
+        {
+            db.RolePermissions.Add(new RolePermission
+            {
+                RoleId = RoleConfiguration.UserRoleId,
+                PermissionId = PermissionConfiguration.ProductsViewId,
+            });
+            db.RolePermissions.AddRange(PermissionConfiguration.SeedRows.Select(p => new RolePermission
+            {
+                RoleId = RoleConfiguration.AdminRoleId,
+                PermissionId = p.Id,
+            }));
+            db.SaveChanges();
+        }
+
         if (db.Users.Any(u => u.NormalizedEmail == "ADMIN@EXAMPLE.COM"))
             return;
 
@@ -483,6 +506,167 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
         (await ReadProblemAsync(del)).GetProperty("errorCode").GetString().Should().Be("AUTH.ROLE_IN_USE");
     }
 
+    // ── Permissions / resource auth ───────────────────────────────────────
+
+    [Fact]
+    public async Task CreateProduct_UserWithoutPermission_Gets_403()
+    {
+        ClearAuth();
+        var userToken = await RegisterAndLoginAsync($"noperm-{Guid.NewGuid():N}@example.com", "A-long-password-123");
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
+
+        var response = await _client.PostAsJsonAsync("/products", new
+        {
+            Name = "Widget Pro",
+            Category = "Gadgets",
+            Price = 12.5m,
+            Stock = 3,
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Assign_CreatePermission_Then_ReLogin_Can_CreateProduct()
+    {
+        ClearAuth();
+        var email = $"grant-{Guid.NewGuid():N}@example.com";
+        const string password = "A-long-password-123";
+        var access = await RegisterAndLoginAsync(email, password);
+        var userId = await FindUserIdAsync(email);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", access);
+        (await _client.PostAsJsonAsync("/products", new
+        {
+            Name = "Widget Pro",
+            Category = "Gadgets",
+            Price = 12.5m,
+            Stock = 3,
+        })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        await AsAdminAsync();
+        var roleName = $"Creators{Guid.NewGuid():N}"[..16];
+        var roleResp = await _client.PostAsJsonAsync("/auth/admin/roles", new { name = roleName });
+        roleResp.EnsureSuccessStatusCode();
+        var role = await roleResp.Content.ReadFromJsonAsync<RoleDto>(Json);
+
+        (await _client.PostAsJsonAsync(
+            $"/auth/admin/roles/{role!.Id}/permissions",
+            new { permission = Permissions.Products.Create }))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await _client.PostAsync($"/auth/admin/users/{userId}/roles/{role.Id}", null))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Old access token invalidated (PermissionVersion bump).
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", access);
+        (await _client.PostAsJsonAsync("/products", new
+        {
+            Name = "Widget Pro",
+            Category = "Gadgets",
+            Price = 12.5m,
+            Stock = 3,
+        })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        ClearAuth();
+        var newAccess = await LoginAsync(email, password);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newAccess);
+        var create = await _client.PostAsJsonAsync("/products", new
+        {
+            Name = "Widget Pro",
+            Category = "Gadgets",
+            Price = 12.5m,
+            Stock = 3,
+        });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Invoice_Edit_Requires_Ownership_Unless_Admin()
+    {
+        ClearAuth();
+        var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
+        var otherEmail = $"other-{Guid.NewGuid():N}@example.com";
+        const string password = "A-long-password-123";
+        await RegisterAndLoginAsync(ownerEmail, password);
+        await RegisterAndLoginAsync(otherEmail, password);
+        var ownerId = await FindUserIdAsync(ownerEmail);
+        var otherId = await FindUserIdAsync(otherEmail);
+
+        await AsAdminAsync();
+        var roleName = $"Finance{Guid.NewGuid():N}"[..16];
+        var roleResp = await _client.PostAsJsonAsync("/auth/admin/roles", new { name = roleName });
+        roleResp.EnsureSuccessStatusCode();
+        var role = await roleResp.Content.ReadFromJsonAsync<RoleDto>(Json);
+
+        foreach (var perm in new[] { Permissions.Invoices.View, Permissions.Invoices.Edit, Permissions.Invoices.Delete })
+        {
+            (await _client.PostAsJsonAsync(
+                $"/auth/admin/roles/{role!.Id}/permissions",
+                new { permission = perm })).EnsureSuccessStatusCode();
+        }
+
+        (await _client.PostAsync($"/auth/admin/users/{ownerId}/roles/{role!.Id}", null)).EnsureSuccessStatusCode();
+        (await _client.PostAsync($"/auth/admin/users/{otherId}/roles/{role.Id}", null)).EnsureSuccessStatusCode();
+
+        ClearAuth();
+        var ownerToken = await LoginAsync(ownerEmail, password);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var created = await _client.PostAsJsonAsync("/invoices", new { number = $"INV-{Guid.NewGuid():N}"[..12], amount = 40m });
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var invoice = await created.Content.ReadFromJsonAsync<InvoiceDto>(Json);
+
+        ClearAuth();
+        var otherToken = await LoginAsync(otherEmail, password);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", otherToken);
+        (await _client.PutAsJsonAsync($"/invoices/{invoice!.Id}", new { number = invoice.Number, amount = 99m }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // View without ownership still allowed (requireOwnership: false).
+        (await _client.GetAsync($"/invoices/{invoice.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        ClearAuth();
+        var adminToken = await LoginAsync("admin@example.com", "ChangeMe-12345");
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        (await _client.PutAsJsonAsync($"/invoices/{invoice.Id}", new { number = invoice.Number, amount = 55m }))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task WorkingHours_Respects_Demo_Hour_Header()
+    {
+        ClearAuth();
+        var token = await LoginAsync("admin@example.com", "ChangeMe-12345");
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var outside = new HttpRequestMessage(HttpMethod.Get, "/auth/demo/working-hours");
+        outside.Headers.TryAddWithoutValidation("X-Demo-Hour", "3");
+        (await _client.SendAsync(outside)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        using var inside = new HttpRequestMessage(HttpMethod.Get, "/auth/demo/working-hours");
+        inside.Headers.TryAddWithoutValidation("X-Demo-Hour", "10");
+        (await _client.SendAsync(inside)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task EnhancedSecurity_Needs_Mfa_And_Trusted_Client()
+    {
+        ClearAuth();
+        var token = await LoginAsync("admin@example.com", "ChangeMe-12345");
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        (await _client.GetAsync("/auth/demo/enhanced-security"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var mfaResp = await _client.PostAsync("/auth/demo/mfa-token", null);
+        mfaResp.EnsureSuccessStatusCode();
+        var mfa = await mfaResp.Content.ReadFromJsonAsync<TokenDto>(Json);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mfa!.AccessToken);
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, "/auth/demo/enhanced-security");
+        req.Headers.TryAddWithoutValidation("X-Trusted-Client", "true");
+        (await _client.SendAsync(req)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private async Task AsAdminAsync()
@@ -567,4 +751,6 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
         [property: System.Text.Json.Serialization.JsonPropertyName("refresh_token")] string RefreshToken);
 
     private sealed record RoleDto(Guid Id, string Name, string NormalizedName);
+
+    private sealed record InvoiceDto(Guid Id, Guid OwnerId, string Number, decimal Amount);
 }

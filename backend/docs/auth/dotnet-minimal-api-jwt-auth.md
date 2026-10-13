@@ -20,7 +20,9 @@ via [`Shared.Mediator`](../../src/Shared/Mediator), [`Shared.Common.Errors`](../
 - `.env` + Options; Scalar Bearer (paste token from `/auth/login`)
 - Secure-by-default fallback authorization policy
 
-**Not in this guide** (Phase 2 — see [end](#phase-2--bridge-to-archtest)): social OAuth, Next.js BFF, JWKS/RS256, fine-grained `perm:*` policies, multi-service client-credentials.
+**Also in this codebase (authorization demos):** `Permission` / `RolePermission`, JWT `permission` claims, `PermissionPolicyProvider`, WorkingHours / EnhancedSecurity policies, Invoice resource auth — see Learn `02-authorization.mdx`. Multi-service YARP + shared `AddMyAppAuth` is on branch `auth-2` — see [gateway-jwt.md](./gateway-jwt.md) and Learn `03-gateway-jwt.mdx`.
+
+**Not in this guide:** social OAuth, Next.js BFF, JWKS/RS256, multi-service client-credentials.
 
 > **Status vs code today.** Implemented in [`MyApp.Api`](../../src/Services/MyApp.Api/) and covered by [`AuthSecurityTests`](../../tests/MyApp.Tests.Integration/AuthSecurityTests.cs). Samples below match the live code; do not add `IdentityDbContext`.
 
@@ -32,7 +34,7 @@ via [`Shared.Mediator`](../../src/Shared/Mediator), [`Shared.Common.Errors`](../
 |---|---|---|
 | `IdentityUser<TKey>` | **No** | Locks you into AspNet* + `UserManager`. Custom `User` keeps `PermissionVersion`, providers, service accounts later. |
 | `IdentityRole<TKey>` | **No** | Roles as our DB rows; later `Permission` / `RolePermission` without Identity’s claim model. |
-| `IdentityUserClaim` / `IdentityRoleClaim` | **No** | Permissions materialize into JWT at issue time (Phase 2). |
+| `IdentityUserClaim` / `IdentityRoleClaim` | **No** | Permissions materialize into JWT at issue time (`permission` claims). |
 | `IdentityUserRole` | **No** | Replaced by `UserRole`. |
 | `IdentityUserLogin` | **No for now** | Google/GitHub later (Phase 2). |
 | `IdentityUserToken` | **No** | We own `RefreshToken` (+ handoff codes later). |
@@ -627,7 +629,7 @@ Handlers depend on **`ITokenService`**, not the concrete class.
 **Usage in a handler:**
 
 ```csharp
-var issued = tokens.IssueTokens(user, roles, familyId);
+var issued = tokens.IssueTokens(user, roles, permissions, familyId);
 db.RefreshTokens.Add(issued.RefreshToken);   // tracked; SaveChanges via TransactionBehavior
 return new TokenResponse(
     issued.AccessToken,
@@ -655,7 +657,7 @@ namespace MyApp.Features.Auth;
 
 public interface ITokenService
 {
-    string CreateAccessToken(User user, IEnumerable<string> roles);
+    string CreateAccessToken(User user, IEnumerable<string> roles, IEnumerable<string> permissions);
     (string Raw, string Hash, DateTime ExpiresAt) GenerateRefreshToken();
     string Hash(string raw);
     int AccessTokenExpiresInSeconds { get; }
@@ -664,7 +666,11 @@ public interface ITokenService
     /// Creates access + refresh entity (caller Adds the entity and maps to TokenResponse;
     /// SaveChanges via TransactionBehavior).
     /// </summary>
-    IssuedTokens IssueTokens(User user, IEnumerable<string> roles, Guid familyId);
+    IssuedTokens IssueTokens(
+        User user,
+        IEnumerable<string> roles,
+        IEnumerable<string> permissions,
+        Guid familyId);
 }
 ```
 
@@ -1157,7 +1163,7 @@ internal sealed class LoginCommandHandler(
             .Select(ur => ur.Role.Name)
             .ToListAsync(ct);
 
-        var issued = tokens.IssueTokens(user, roles, Guid.NewGuid());
+        var issued = tokens.IssueTokens(user, roles, permissions, Guid.NewGuid());
         db.RefreshTokens.Add(issued.RefreshToken);
         return new TokenResponse(
             issued.AccessToken,
@@ -1315,7 +1321,7 @@ internal sealed class RefreshTokenCommandHandler(
         }
 
         var roles = stored.User.UserRoles.Select(ur => ur.Role.Name);
-        var issued = tokens.IssueTokens(stored.User, roles, stored.FamilyId);
+        var issued = tokens.IssueTokens(stored.User, roles, permissions, stored.FamilyId);
         db.RefreshTokens.Add(issued.RefreshToken);
         return new TokenResponse(
             issued.AccessToken,
@@ -2071,16 +2077,16 @@ Invalid login body (empty email) → **400 Validation** from `ValidationBehavior
 
 ---
 
-## Phase 2 — bridge to arch.test
+## Phase 2 — permissions + gateway (status)
 
-| Capability | Direction |
+| Capability | Status in MyApp |
 |---|---|
-| Fine-grained permissions | `Permission` + `RolePermission`; JWT `permissions` / `perm:*` |
-| Cached revoke | `tokenver:{userId}` TTL + `POST /auth/revoke` |
-| Social login | Google/GitHub + handoff code |
-| Next.js BFF | Encrypted HttpOnly session; browser never sees JWT |
-| Asymmetric JWT | ES256/RS256 + JWKS |
-| Service accounts | Client-credentials + scopes |
+| Fine-grained permissions | **Done on `auth`:** `Permission` + `RolePermission`; JWT claim type `permission`; values `Permissions.*` |
+| Dynamic permission policies | **Done:** `PermissionPolicyProvider` + claim-only handler |
+| Resource auth (Invoice) | **Done:** `ResourcePermissionHandler` + `/invoices` |
+| WorkingHours / EnhancedSecurity demos | **Done:** `/auth/demo/*` |
+| Shared JWT registration + YARP | **Branch `auth-2`:** `MyApp.Auth.Jwt` `AddMyAppAuth` + Gateway + ProductsApi (Hospital-style, claim-only — no DB permission recheck) |
+| Cached revoke / social / BFF / RS256 / M2M | Still future / out of scope for this demo |
 
 Additive on **custom `User` + `PermissionVersion` + Products-style slices**.
 

@@ -7,7 +7,7 @@ public sealed class User
     public required string NormalizedEmail { get; set; }
     public required string PasswordHash { get; set; }
     public bool IsBanned { get; set; }
-    /// <summary>Bumped on ban / sign-out-everywhere. JWT claim <c>token_version</c>.</summary>
+    /// <summary>Bumped on ban / sign-out-everywhere / role or permission changes. JWT claim <c>token_version</c>.</summary>
     public int PermissionVersion { get; set; } = 1;
     public int AccessFailedCount { get; set; }
     public DateTimeOffset? LockoutEnd { get; set; }
@@ -22,6 +22,7 @@ public sealed class Role
     public required string Name { get; set; }
     public required string NormalizedName { get; set; }
     public List<UserRole> UserRoles { get; set; } = [];
+    public List<RolePermission> RolePermissions { get; set; } = [];
 }
 
 public sealed class UserRole
@@ -30,6 +31,21 @@ public sealed class UserRole
     public User User { get; set; } = null!;
     public Guid RoleId { get; init; }
     public Role Role { get; set; } = null!;
+}
+
+public sealed class Permission
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required string Name { get; set; }
+    public List<RolePermission> RolePermissions { get; set; } = [];
+}
+
+public sealed class RolePermission
+{
+    public Guid RoleId { get; init; }
+    public Role Role { get; set; } = null!;
+    public Guid PermissionId { get; init; }
+    public Permission Permission { get; set; } = null!;
 }
 
 public sealed class RefreshToken

@@ -18,27 +18,28 @@ public sealed class TokenService : ITokenService
     {
         _jwt = jwt.Value;
         _clock = clock;
-        // Cache key + credentials once — do not rebuild per request.
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Secret));
         _creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
     }
 
-    public string CreateAccessToken(User user, IEnumerable<string> roles)
+    public string CreateAccessToken(
+        User user,
+        IEnumerable<string> roles,
+        IEnumerable<string> permissions)
     {
         var now = _clock.GetUtcNow();
         var expires = now.AddMinutes(_jwt.AccessTokenMinutes);
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()), //~sub = userId
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now.UtcDateTime).ToString(), ClaimValueTypes.Integer64),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(AuthClaims.TokenVersion, user.PermissionVersion.ToString()),
         };
         claims.AddRange(roles.Select(r => new Claim(AuthClaims.Role, r)));
-        //~new Claim("role", "X"), new Claim("role", "Y")....
-
+        claims.AddRange(permissions.Select(p => new Claim(AuthClaims.Permission, p)));
 
         var descriptor = new SecurityTokenDescriptor
         {
@@ -56,7 +57,7 @@ public sealed class TokenService : ITokenService
     public (string Raw, string Hash, DateTime ExpiresAt) GenerateRefreshToken()
     {
         var bytes = RandomNumberGenerator.GetBytes(64);
-        var raw = Base64UrlEncoder.Encode(bytes); // URL-safe; avoid + / =
+        var raw = Base64UrlEncoder.Encode(bytes);
         var expires = _clock.GetUtcNow().UtcDateTime.AddDays(_jwt.RefreshTokenDays);
         return (raw, Hash(raw), expires);
     }
@@ -70,17 +71,20 @@ public sealed class TokenService : ITokenService
     public int AccessTokenExpiresInSeconds => _jwt.AccessTokenMinutes * 60;
 
     public IssuedTokens IssueTokens(
-        User user, IEnumerable<string> roles, Guid familyId)
+        User user,
+        IEnumerable<string> roles,
+        IEnumerable<string> permissions,
+        Guid familyId)
     {
-        var accessToken = CreateAccessToken(user, roles);
+        var accessToken = CreateAccessToken(user, roles, permissions);
         var (rawRefreshToken, hash, expiresAt) = GenerateRefreshToken();
         var now = _clock.GetUtcNow().UtcDateTime;
 
         var refreshToken = new RefreshToken
         {
             UserId = user.Id,
-            TokenHash = hash,       // store hash only — never the raw token
-            FamilyId = familyId,    // same family across rotations; reuse kills the family
+            TokenHash = hash,
+            FamilyId = familyId,
             CreatedAt = now,
             ExpiresAt = expiresAt,
         };

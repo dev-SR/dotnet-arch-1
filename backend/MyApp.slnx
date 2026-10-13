@@ -2,6 +2,8 @@
   <Folder Name="/src/" />
   <Folder Name="/src/Services/">
     <Project Path="src/Services/MyApp.Api/MyApp.Api.csproj" />
+    <Project Path="src/Services/MyApp.Gateway/MyApp.Gateway.csproj" />
+    <Project Path="src/Services/MyApp.ProductsApi/MyApp.ProductsApi.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/Mediator/Mediator.csproj" />
@@ -11,6 +13,9 @@
   </Folder>
   <Folder Name="/src/Shared/Common/">
     <Project Path="src/Shared/Common/Shared.Common.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/MyApp.Auth.Jwt/">
+    <Project Path="src/Shared/MyApp.Auth.Jwt/MyApp.Auth.Jwt.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MyApp.Tests.Integration/MyApp.Tests.Integration.csproj" />

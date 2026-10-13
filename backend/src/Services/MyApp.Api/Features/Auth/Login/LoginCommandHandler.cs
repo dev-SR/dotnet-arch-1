@@ -64,12 +64,20 @@ internal sealed class LoginCommandHandler(
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
 
-        var roles = await db.UserRoles
+        var roleRows = await db.UserRoles
             .Apply(new UserRolesByUserIdSpecification(user.Id))
-            .Select(ur => ur.Role.Name)
+            .Select(ur => new { ur.RoleId, ur.Role.Name })
             .ToListAsync(ct);
 
-        var issued = tokens.IssueTokens(user, roles, Guid.NewGuid());
+        var roles = roleRows.Select(r => r.Name).ToList();
+        var permissions = await db.RolePermissions
+            .Apply(new RolePermissionsByRoleIdsSpecification(roleRows.Select(r => r.RoleId))
+                .And(RolePermissionsWithPermissionSpecification.Instance))
+            .Select(rp => rp.Permission.Name)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var issued = tokens.IssueTokens(user, roles, permissions, Guid.NewGuid());
         db.RefreshTokens.Add(issued.RefreshToken);
         return new TokenResponse(
             issued.AccessToken,

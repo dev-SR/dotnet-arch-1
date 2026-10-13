@@ -17,6 +17,72 @@ namespace MyApp.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("MyApp.Features.Auth.Permission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Permissions");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("a1111111-1111-1111-1111-111111111111"),
+                            Name = "Permissions.Products.View"
+                        },
+                        new
+                        {
+                            Id = new Guid("a1111111-1111-1111-1111-111111111112"),
+                            Name = "Permissions.Products.Create"
+                        },
+                        new
+                        {
+                            Id = new Guid("a1111111-1111-1111-1111-111111111113"),
+                            Name = "Permissions.Products.Edit"
+                        },
+                        new
+                        {
+                            Id = new Guid("a1111111-1111-1111-1111-111111111114"),
+                            Name = "Permissions.Products.Delete"
+                        },
+                        new
+                        {
+                            Id = new Guid("a2222222-2222-2222-2222-222222222221"),
+                            Name = "Permissions.Users.View"
+                        },
+                        new
+                        {
+                            Id = new Guid("a2222222-2222-2222-2222-222222222222"),
+                            Name = "Permissions.Users.Ban"
+                        },
+                        new
+                        {
+                            Id = new Guid("a3333333-3333-3333-3333-333333333331"),
+                            Name = "Permissions.Invoices.View"
+                        },
+                        new
+                        {
+                            Id = new Guid("a3333333-3333-3333-3333-333333333332"),
+                            Name = "Permissions.Invoices.Edit"
+                        },
+                        new
+                        {
+                            Id = new Guid("a3333333-3333-3333-3333-333333333333"),
+                            Name = "Permissions.Invoices.Delete"
+                        });
+                });
+
             modelBuilder.Entity("MyApp.Features.Auth.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -90,6 +156,73 @@ namespace MyApp.Persistence.Migrations
                             Id = new Guid("22222222-2222-2222-2222-222222222222"),
                             Name = "Admin",
                             NormalizedName = "ADMIN"
+                        });
+                });
+
+            modelBuilder.Entity("MyApp.Features.Auth.RolePermission", b =>
+                {
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PermissionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RoleId", "PermissionId");
+
+                    b.HasIndex("PermissionId");
+
+                    b.ToTable("RolePermissions");
+
+                    b.HasData(
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("a1111111-1111-1111-1111-111111111111")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a1111111-1111-1111-1111-111111111111")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a1111111-1111-1111-1111-111111111112")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a1111111-1111-1111-1111-111111111113")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a1111111-1111-1111-1111-111111111114")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a2222222-2222-2222-2222-222222222221")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a2222222-2222-2222-2222-222222222222")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a3333333-3333-3333-3333-333333333331")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a3333333-3333-3333-3333-333333333332")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("a3333333-3333-3333-3333-333333333333")
                         });
                 });
 
@@ -201,6 +334,35 @@ namespace MyApp.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Customers");
+                });
+
+            modelBuilder.Entity("MyApp.Features.Invoices.Invoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.ToTable("Invoices");
                 });
 
             modelBuilder.Entity("MyApp.Features.Orders.Order", b =>
@@ -376,6 +538,25 @@ namespace MyApp.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MyApp.Features.Auth.RolePermission", b =>
+                {
+                    b.HasOne("MyApp.Features.Auth.Permission", "Permission")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MyApp.Features.Auth.Role", "Role")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Permission");
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("MyApp.Features.Auth.UserRole", b =>
                 {
                     b.HasOne("MyApp.Features.Auth.Role", "Role")
@@ -478,8 +659,15 @@ namespace MyApp.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MyApp.Features.Auth.Permission", b =>
+                {
+                    b.Navigation("RolePermissions");
+                });
+
             modelBuilder.Entity("MyApp.Features.Auth.Role", b =>
                 {
+                    b.Navigation("RolePermissions");
+
                     b.Navigation("UserRoles");
                 });
 
