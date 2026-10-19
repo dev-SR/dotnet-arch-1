@@ -13,16 +13,22 @@ Minimal multi-service auth demo that continues the monolith work on `auth`.
 | `MyApp.Api` | `http://localhost:5101` | Token issuer + IAM + **products** (DB) + OpenAPI JSON |
 | `MyApp.InvoicesApi` | `http://localhost:5102` | Invoice CRUD + ownership; claim-only `AddMyAppAuth` + Problem Details |
 | `MyApp.Auth.Jwt` | — | Shared HS256 + policies + `JwtBearerProblemDetails` + resource ownership |
-| `Shared.Common` | — | `Error` / `ToProblem` + `AddSharedExceptionHandling` (used by Auth + Invoices) |
+| `Shared.Common` | — | `Error` / `ToProblem` + `AddSharedExceptionHandling` (Auth + Invoices) |
 
 ## Docs (standard)
 
-Unified API reference on the **gateway** (not private service ports):
-
 - **Scalar:** http://localhost:5100/scalar  
-  Document dropdown: **Auth + Products** (default) · **Invoices** (`/invoices` is not under the Auth doc)
-- Proxied specs: `/openapi/auth/v1.json`, `/openapi/invoices/v1.json`  
-  (aliases under `/scalar/openapi/...`; Try-it rewritten to the gateway base URL)
+  Dropdown: **Auth + Products** (default) · **Invoices**
+- Proxied specs: `/openapi/auth/v1.json`, `/openapi/invoices/v1.json`
+
+## YARP (quick)
+
+| Client | Upstream |
+| --- | --- |
+| `/auth/*`, `/products/*` | AuthApi `:5101` |
+| `/invoices/*` | InvoicesApi `:5102` |
+
+Gateway does not validate JWT; forwards `Authorization`.
 
 ## Run
 
@@ -37,13 +43,10 @@ dotnet run --project src/Services/MyApp.Gateway
 
 ## Design notes
 
-- Same claim shape as Learn 01/02: type `permission`, values `Permissions.*`.
-- AuthApi keeps **products**; InvoicesApi is the second host (no product duplication).
-- InvoicesApi does **not** hit the IAM database — trusts validated JWT claims + ownership via `sub`.
-- Error contract matches AuthApi: `application/problem+json` with `errorCode` / `traceId`  
-  (`INVOICE.NOT_FOUND`, `INVOICE.FORBIDDEN`, `AUTH.UNAUTHENTICATED`, validation, …).
-- AuthApi still runs `ConfigureJwtBearer` ban / `token_version` checks (issuer host only).
-- Gateway does not validate JWT; each API host does.
+- AuthApi issues JWT + seeds `Permissions.*`; InvoicesApi only validates claims + ownership.
+- InvoicesApi has no IAM DB — `Permissions.cs` / `ResourceAuthorization.cs` in `MyApp.Auth.Jwt`.
+- Error contract: `application/problem+json` (`INVOICE.*`, `AUTH.*`, validation).
+- AuthApi `ConfigureJwtBearer` = ban / `token_version` only (issuer host).
 
 ## Tests
 
