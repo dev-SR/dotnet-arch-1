@@ -1,9 +1,9 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
+using MyApp.Auth.Jwt;
 using MyApp.Features.Auth.Specifications;
 using MyApp.Persistence;
 using Shared.Common.Errors;
@@ -12,8 +12,8 @@ using Shared.Common.Specifications;
 namespace MyApp.Features.Auth;
 
 /// <summary>
-/// AuthApi-only JWT events (ban / token_version). Crypto validation comes from
-/// <c>AddMyAppAuth</c> in MyApp.Auth.Jwt.
+/// AuthApi-only JWT events (ban / token_version). Crypto validation + Problem Details
+/// challenge/forbid come from <c>AddMyAppAuth</c>; this replaces Events and re-attaches them.
 /// </summary>
 public sealed class ConfigureJwtBearer : IConfigureNamedOptions<JwtBearerOptions>
 {
@@ -29,29 +29,9 @@ public sealed class ConfigureJwtBearer : IConfigureNamedOptions<JwtBearerOptions
         {
             OnTokenValidated = OnTokenValidatedAsync,
             OnAuthenticationFailed = _ => Task.CompletedTask,
-            OnChallenge = OnChallengeAsync,
-            OnForbidden = OnForbiddenAsync,
+            OnChallenge = JwtBearerProblemDetails.OnChallengeAsync,
+            OnForbidden = JwtBearerProblemDetails.OnForbiddenAsync,
         };
-    }
-
-    private static async Task OnChallengeAsync(JwtBearerChallengeContext context)
-    {
-        context.HandleResponse();
-        if (context.HttpContext.Response.HasStarted) return;
-
-        var error = context.HttpContext.Items.TryGetValue(JwtBearerProblem.ChallengeErrorItemKey, out var boxed)
-                    && boxed is Error stored
-            ? stored
-            : MapChallengeError(context);
-        await JwtBearerProblem.WriteAsync(context.HttpContext, error);
-    }
-
-    private static async Task OnForbiddenAsync(ForbiddenContext context)
-    {
-        if (context.HttpContext.Response.HasStarted) return;
-        await JwtBearerProblem.WriteAsync(
-            context.HttpContext,
-            Error.Forbidden("AUTH.FORBIDDEN", "You are not allowed to perform this action."));
     }
 
     private static async Task OnTokenValidatedAsync(TokenValidatedContext context)
@@ -72,7 +52,7 @@ public sealed class ConfigureJwtBearer : IConfigureNamedOptions<JwtBearerOptions
 
         if (user is null || user.IsBanned)
         {
-            context.HttpContext.Items[JwtBearerProblem.ChallengeErrorItemKey] =
+            context.HttpContext.Items[JwtBearerProblemDetails.ChallengeErrorItemKey] =
                 Error.Unauthorized("AUTH.ACCOUNT_DISABLED", "Account is locked or disabled.");
             context.Fail("banned");
             return;
@@ -81,14 +61,9 @@ public sealed class ConfigureJwtBearer : IConfigureNamedOptions<JwtBearerOptions
         var version = context.Principal!.FindFirstValue(AuthClaims.TokenVersion);
         if (version is null || !int.TryParse(version, out var tv) || tv != user.PermissionVersion)
         {
-            context.HttpContext.Items[JwtBearerProblem.ChallengeErrorItemKey] =
+            context.HttpContext.Items[JwtBearerProblemDetails.ChallengeErrorItemKey] =
                 Error.Unauthorized("AUTH.TOKEN_REVOKED", "Token has been revoked.");
             context.Fail("token_version");
         }
     }
-
-    private static Error MapChallengeError(JwtBearerChallengeContext context) =>
-        context.AuthenticateFailure is not null
-            ? Error.Unauthorized("AUTH.INVALID_TOKEN", "Invalid or expired access token.")
-            : Error.Unauthorized("AUTH.UNAUTHENTICATED", "Authentication is required.");
 }

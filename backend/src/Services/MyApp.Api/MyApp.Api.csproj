@@ -9,12 +9,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- OpenAPI + Scalar -->
+        <!-- OpenAPI JSON (Scalar UI is on MyApp.Gateway) -->
         <PackageReference Include="Bogus" />
         <PackageReference Include="DotNetEnv" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-        <PackageReference Include="Scalar.AspNetCore" />
 
         <!-- EF Core 10 + SQLite -->
         <PackageReference Include="Microsoft.EntityFrameworkCore" />

@@ -29,5 +29,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Services\MyApp.Api\MyApp.Api.csproj" />
+        <ProjectReference Include="..\..\src\Services\MyApp.InvoicesApi\MyApp.InvoicesApi.csproj" />
     </ItemGroup>
 </Project>

@@ -119,8 +119,7 @@ MyApp/backend/src/Services/MyApp.Api/
 │   ├── TokenService.cs
 │   ├── IssuedTokens.cs
 │   ├── TokenResponse.cs
-│   ├── ConfigureJwtBearer.cs
-│   ├── JwtBearerProblem.cs
+│   ├── ConfigureJwtBearer.cs   # AuthApi-only ban / token_version; challenge/forbid via MyApp.Auth.Jwt
 │   ├── Specifications/
 │   │   └── AuthSpecs.cs
 │   ├── RegisterUser/
@@ -1512,15 +1511,10 @@ It does **not** issue tokens, talk to Carter, or return `ErrorOr`. Handlers stil
 
 ### Problem Details helper (shared by all events)
 
-Events should not each reinvent response writing. `JwtBearerProblem` sets `WWW-Authenticate` and writes Problem Details via `Error.ToProblem`:
+Events should not each reinvent response writing. **`JwtBearerProblemDetails`** lives in `MyApp.Auth.Jwt` (used by AuthApi and InvoicesApi). It sets `WWW-Authenticate` and writes Problem Details via `Error.ToProblem`. `AddMyAppAuth` wires `OnChallenge` / `OnForbidden` by default; AuthApi’s `ConfigureJwtBearer` re-attaches those handlers and adds issuer-only `OnTokenValidated`.
 
-```csharp title="MyApp/backend/src/Services/MyApp.Api/Features/Auth/JwtBearerProblem.cs"
-using Shared.Common.Errors;
-using Shared.Common.Errors.Http;
-
-namespace MyApp.Features.Auth;
-
-internal static class JwtBearerProblem
+```csharp title="MyApp/backend/src/Shared/MyApp.Auth.Jwt/JwtBearerProblemDetails.cs"
+public static class JwtBearerProblemDetails
 {
     public const string ChallengeErrorItemKey = "auth.challengeError";
 
@@ -1531,12 +1525,15 @@ internal static class JwtBearerProblem
         http.Response.Headers.WWWAuthenticate = error.Code switch
         {
             "AUTH.TOKEN_EXPIRED" => "Bearer error=\"invalid_token\", error_description=\"The access token has expired\"",
-            "AUTH.TOKEN_INVALID" => "Bearer error=\"invalid_token\"",
+            "AUTH.TOKEN_INVALID" or "AUTH.INVALID_TOKEN" => "Bearer error=\"invalid_token\"",
             _ => "Bearer",
         };
 
         await error.ToProblem(http).ExecuteAsync(http);
     }
+
+    public static Task OnChallengeAsync(JwtBearerChallengeContext context) { /* HandleResponse + WriteAsync */ }
+    public static Task OnForbiddenAsync(ForbiddenContext context) { /* AUTH.FORBIDDEN */ }
 }
 ```
 
@@ -1553,132 +1550,26 @@ Write the HTTP body in **`OnChallenge` / `OnForbidden`**. Call `HandleResponse()
 
 **Stash typed `Error` in `HttpContext.Items[ChallengeErrorItemKey]` from `OnTokenValidated`** so `OnChallenge` does not string-match failure messages.
 
-### `ConfigureJwtBearer.cs` (full)
+### `ConfigureJwtBearer.cs` (AuthApi — issuer-only events)
 
-Put the options table + events into the `IConfigureNamedOptions` implementation:
+Crypto validation + default challenge/forbid come from `AddMyAppAuth`. AuthApi replaces `Events` to add ban / `token_version`, and reuses shared Problem Details handlers:
 
 ```csharp title="MyApp/backend/src/Services/MyApp.Api/Features/Auth/ConfigureJwtBearer.cs"
-using System.Security.Claims;
-using System.Text;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
-using MyApp.Config;
-using MyApp.Features.Auth.Specifications;
-using MyApp.Persistence;
-using Shared.Common.Errors;
-using Shared.Common.Specifications;
-
-namespace MyApp.Features.Auth;
-
-public sealed class ConfigureJwtBearer(IOptions<JwtOptions> jwt) : IConfigureNamedOptions<JwtBearerOptions>
+public sealed class ConfigureJwtBearer : IConfigureNamedOptions<JwtBearerOptions>
 {
-    public void Configure(string? name, JwtBearerOptions options)
-    {
-        if (name != JwtBearerDefaults.AuthenticationScheme) return;
-        Configure(options);
-    }
-
     public void Configure(JwtBearerOptions options)
     {
-        var o = jwt.Value;
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(o.Secret));
-
-        options.MapInboundClaims = false;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = o.Issuer,
-            ValidateAudience = true,
-            ValidAudience = o.Audience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = key,
-            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero,
-            NameClaimType = JwtRegisteredClaimNames.Sub,
-            RoleClaimType = AuthClaims.Role,
-        };
-
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = OnTokenValidatedAsync,
             OnAuthenticationFailed = _ => Task.CompletedTask,
-            OnChallenge = OnChallengeAsync,
-            OnForbidden = OnForbiddenAsync,
+            OnChallenge = JwtBearerProblemDetails.OnChallengeAsync,
+            OnForbidden = JwtBearerProblemDetails.OnForbiddenAsync,
         };
     }
 
-    private static async Task OnChallengeAsync(JwtBearerChallengeContext context)
-    {
-        context.HandleResponse();
-        if (context.HttpContext.Response.HasStarted) return;
-
-        var error = context.HttpContext.Items.TryGetValue(JwtBearerProblem.ChallengeErrorItemKey, out var boxed)
-                    && boxed is Error stored
-            ? stored
-            : MapChallengeError(context);
-        await JwtBearerProblem.WriteAsync(context.HttpContext, error);
-    }
-
-    private static async Task OnForbiddenAsync(ForbiddenContext context)
-    {
-        if (context.HttpContext.Response.HasStarted) return;
-        await JwtBearerProblem.WriteAsync(
-            context.HttpContext,
-            Error.Forbidden("AUTH.FORBIDDEN", "You are not allowed to perform this action."));
-    }
-
-    private static async Task OnTokenValidatedAsync(TokenValidatedContext context)
-    {
-        var sub = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub)
-                  ?? context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (sub is null || !Guid.TryParse(sub, out var userId))
-        {
-            context.HttpContext.Items[JwtBearerProblem.ChallengeErrorItemKey] =
-                Error.Unauthorized("AUTH.UNAUTHORIZED", "Authentication is required.");
-            context.Fail("Missing subject.");
-            return;
-        }
-
-        var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-        var user = await db.Users
-            .Apply(new UserByIdSpecification(userId))
-            .SingleOrDefaultAsync(context.HttpContext.RequestAborted);
-
-        if (user is null || user.IsBanned)
-        {
-            context.HttpContext.Items[JwtBearerProblem.ChallengeErrorItemKey] =
-                Error.Unauthorized("AUTH.ACCOUNT_DISABLED", "Account is locked or disabled.");
-            context.Fail("User banned or missing.");
-            return;
-        }
-
-        var version = context.Principal?.FindFirst(AuthClaims.TokenVersion)?.Value;
-        if (version is null || !int.TryParse(version, out var tv) || tv != user.PermissionVersion)
-        {
-            context.HttpContext.Items[JwtBearerProblem.ChallengeErrorItemKey] =
-                Error.Unauthorized("AUTH.UNAUTHORIZED", "Authentication is required.");
-            context.Fail("Token version mismatch.");
-        }
-    }
-
-    private static Error MapChallengeError(JwtBearerChallengeContext context)
-    {
-        var ex = context.AuthenticateFailure
-                 ?? context.HttpContext.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure;
-
-        if (ex is SecurityTokenExpiredException)
-            return Error.Unauthorized("AUTH.TOKEN_EXPIRED", "The access token has expired.");
-
-        if (ex is SecurityTokenException)
-            return Error.Unauthorized("AUTH.TOKEN_INVALID", "The access token is invalid.");
-
-        return Error.Unauthorized("AUTH.UNAUTHORIZED", "Authentication is required.");
-    }
+    // OnTokenValidated: stash Error in Items[ChallengeErrorItemKey] + context.Fail
+    // for banned users / token_version mismatch → OnChallenge writes Problem Details
 }
 ```
 
@@ -2023,7 +1914,7 @@ cd MyApp/backend/src/Services/MyApp.Api
 dotnet run
 ```
 
-Scalar → `/scalar` → Authorize with Bearer after login.
+Scalar (branch `auth-2`): gateway → `http://localhost:5100/scalar` (dropdown: **Auth + Products** · **Invoices**). AuthApi / InvoicesApi expose OpenAPI JSON only (`/openapi/v1.json`), not a local Scalar UI.
 
 ```bash
 curl -sk -X POST $API/auth/login -H "Content-Type: application/json" \
@@ -2055,7 +1946,7 @@ Invalid login body (empty email) → **400 Validation** from `ValidationBehavior
 | Banned (refresh) | Handler → `Error.Forbidden("AUTH.ACCOUNT_DISABLED")` |
 | Banned / `token_version` mismatch (bearer) | `OnTokenValidated` → `Fail` → `OnChallenge` → Problem Details |
 | Expired / bad signature / wrong alg | `OnAuthenticationFailed` → `OnChallenge` → `AUTH.TOKEN_EXPIRED` / `AUTH.TOKEN_INVALID` |
-| No Bearer on protected endpoint | `OnChallenge` → `AUTH.UNAUTHORIZED` |
+| No Bearer on protected endpoint | `OnChallenge` → `AUTH.UNAUTHENTICATED` (shared `JwtBearerProblemDetails`) |
 | Authenticated but fails `AdminOnly` | `OnForbidden` → `AUTH.FORBIDDEN` |
 | Forgot auth on endpoint | Fallback policy + `OnChallenge` |
 | Docs blocked | `.AllowAnonymous()` on OpenAPI/Scalar |
@@ -2083,9 +1974,9 @@ Invalid login body (empty email) → **400 Validation** from `ValidationBehavior
 |---|---|
 | Fine-grained permissions | **Done on `auth`:** `Permission` + `RolePermission`; JWT claim type `permission`; values `Permissions.*` |
 | Dynamic permission policies | **Done:** `PermissionPolicyProvider` + claim-only handler |
-| Resource auth (Invoice) | **Done:** `ResourcePermissionHandler` + `/invoices` |
+| Resource auth (Invoice) | **Done on `auth-2`:** `ResourcePermissionHandler` in `MyApp.Auth.Jwt`; host `MyApp.InvoicesApi` (`/invoices`) |
 | WorkingHours / EnhancedSecurity demos | **Done:** `/auth/demo/*` |
-| Shared JWT registration + YARP | **Branch `auth-2`:** `MyApp.Auth.Jwt` `AddMyAppAuth` + Gateway + ProductsApi (Hospital-style, claim-only — no DB permission recheck) |
+| Shared JWT + Problem Details + YARP | **Branch `auth-2`:** `AddMyAppAuth` + `JwtBearerProblemDetails` + Gateway Scalar; InvoicesApi uses `Shared.Common` error channels |
 | Cached revoke / social / BFF / RS256 / M2M | Still future / out of scope for this demo |
 
 Additive on **custom `User` + `PermissionVersion` + Products-style slices**.

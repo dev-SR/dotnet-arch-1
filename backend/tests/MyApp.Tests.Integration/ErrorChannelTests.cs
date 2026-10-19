@@ -5,18 +5,22 @@ using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using MyApp.Features.Auth;
 using MyApp.Persistence;
+using MyApp.Persistence.Configurations;
 
 namespace MyApp.Tests.Integration;
 
 public class ErrorChannelTests : IClassFixture<MyAppFactory>
 {
+    private readonly MyAppFactory _factory;
     private readonly HttpClient _client;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -25,16 +29,75 @@ public class ErrorChannelTests : IClassFixture<MyAppFactory>
 
     public ErrorChannelTests(MyAppFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
+        SeedAdminWithPermissions();
         AuthenticateAsync().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Product mutations require Permissions.Products.* — plain registered User only has View.
+    /// Use seeded Admin (all permissions via HasData / RolePermissions).
+    /// </summary>
+    private void SeedAdminWithPermissions()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.EnsureCreated();
+
+        if (!db.Roles.Any())
+        {
+            db.Roles.AddRange(
+                new Role { Id = RoleConfiguration.UserRoleId, Name = Roles.User, NormalizedName = "USER" },
+                new Role { Id = RoleConfiguration.AdminRoleId, Name = Roles.Admin, NormalizedName = "ADMIN" });
+            db.SaveChanges();
+        }
+
+        if (!db.Permissions.Any())
+        {
+            db.Permissions.AddRange(PermissionConfiguration.SeedRows
+                .Select(r => new Permission { Id = r.Id, Name = r.Name }));
+            db.SaveChanges();
+        }
+
+        if (!db.RolePermissions.Any())
+        {
+            db.RolePermissions.Add(new RolePermission
+            {
+                RoleId = RoleConfiguration.UserRoleId,
+                PermissionId = PermissionConfiguration.ProductsViewId,
+            });
+            db.RolePermissions.AddRange(PermissionConfiguration.SeedRows.Select(p => new RolePermission
+            {
+                RoleId = RoleConfiguration.AdminRoleId,
+                PermissionId = p.Id,
+            }));
+            db.SaveChanges();
+        }
+
+        if (db.Users.Any(u => u.NormalizedEmail == "ADMIN@EXAMPLE.COM"))
+            return;
+
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<User>>();
+        var admin = new User
+        {
+            Email = "admin@example.com",
+            NormalizedEmail = "ADMIN@EXAMPLE.COM",
+            PasswordHash = "",
+        };
+        admin.PasswordHash = hasher.HashPassword(admin, "ChangeMe-12345");
+        db.Users.Add(admin);
+        db.UserRoles.Add(new UserRole { UserId = admin.Id, RoleId = RoleConfiguration.AdminRoleId });
+        db.SaveChanges();
     }
 
     private async Task AuthenticateAsync()
     {
-        var email = $"tester-{Guid.NewGuid():N}@example.com";
-        const string password = "A-long-password-123";
-        await _client.PostAsJsonAsync("/auth/register", new { email, password });
-        var login = await _client.PostAsJsonAsync("/auth/login", new { email, password });
+        var login = await _client.PostAsJsonAsync("/auth/login", new
+        {
+            email = "admin@example.com",
+            password = "ChangeMe-12345",
+        });
         login.EnsureSuccessStatusCode();
         using var doc = await JsonDocument.ParseAsync(await login.Content.ReadAsStreamAsync());
         var token = doc.RootElement.GetProperty("access_token").GetString()!;
@@ -322,7 +385,7 @@ public class ErrorChannelTests : IClassFixture<MyAppFactory>
 }
 
 /// <summary>Same as <see cref="MyAppFactory"/> but Production — diag routes must not register.</summary>
-file sealed class ProductionMyAppFactory : WebApplicationFactory<Program>
+file sealed class ProductionMyAppFactory : WebApplicationFactory<AppDbContext>
 {
     private readonly string _dbName = $"myapp-prod-tests-{Guid.NewGuid()}";
 

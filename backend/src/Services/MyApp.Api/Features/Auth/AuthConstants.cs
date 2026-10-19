@@ -1,13 +1,12 @@
-using System.Security.Claims;
-using Microsoft.IdentityModel.JsonWebTokens;
 using MyApp.Auth.Jwt;
 
 namespace MyApp.Features.Auth;
 
+// Role names — same strings as MyApp.Auth.Jwt.Roles (JWT RoleClaimType).
 public static class Roles
 {
-    public const string User = "User";
-    public const string Admin = "Admin";
+    public const string User = MyApp.Auth.Jwt.Roles.User;
+    public const string Admin = MyApp.Auth.Jwt.Roles.Admin;
 }
 
 public static class Policies
@@ -17,7 +16,7 @@ public static class Policies
     public const string EnhancedSecurity = "EnhancedSecurity";
 }
 
-/// <summary>Forwards to shared <see cref="MyApp.Auth.Jwt.Permissions"/> (gateway + ProductsApi).</summary>
+/// <summary>Forwards to shared <see cref="MyApp.Auth.Jwt.Permissions"/>.</summary>
 public static class Permissions
 {
     public const string Prefix = MyApp.Auth.Jwt.Permissions.Prefix;
@@ -53,6 +52,7 @@ public static class AuthClaims
     public const string Permission = AuthClaimTypes.Permission;
     public const string Amr = AuthClaimTypes.Amr;
 
-    public static Guid GetUserId(this ClaimsPrincipal p) =>
-        Guid.Parse(p.FindFirstValue(JwtRegisteredClaimNames.Sub)!);
+    /// <inheritdoc cref="ClaimsPrincipalExtensions.GetUserId"/>
+    public static Guid GetUserId(this System.Security.Claims.ClaimsPrincipal p) =>
+        ClaimsPrincipalExtensions.GetUserId(p);
 }

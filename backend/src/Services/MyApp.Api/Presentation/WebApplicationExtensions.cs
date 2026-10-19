@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using Scalar.AspNetCore;
 using Shared.Common.Exceptions.Http;
 
 namespace MyApp.Presentation;
@@ -18,14 +16,8 @@ public static class WebApplicationExtensions
         app.MapCarter();
         app.MapHealthChecks("/health").AllowAnonymous();
 
-        if (app.Environment.IsDevelopment())
-        {
-            app.MapOpenApi().AllowAnonymous();
-            app.MapScalarApiReference(options =>
-            {
-                options.EnablePersistentAuthentication();
-            }).AllowAnonymous();
-        }
+        // OpenAPI JSON only — Scalar UI lives on MyApp.Gateway (/scalar).
+        app.MapOpenApi().AllowAnonymous();
 
         return app;
     }

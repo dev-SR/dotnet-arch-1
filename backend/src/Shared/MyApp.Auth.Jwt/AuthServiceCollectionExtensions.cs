@@ -51,6 +51,14 @@ public static class AuthServiceCollectionExtensions
                     NameClaimType = JwtRegisteredClaimNames.Sub,
                     RoleClaimType = AuthClaimTypes.Role,
                 };
+
+                // Claim-only hosts (InvoicesApi): Problem Details on 401/403.
+                // AuthApi replaces Events via ConfigureJwtBearer but keeps these handlers.
+                opts.Events = new JwtBearerEvents
+                {
+                    OnChallenge = JwtBearerProblemDetails.OnChallengeAsync,
+                    OnForbidden = JwtBearerProblemDetails.OnForbiddenAsync,
+                };
             });
 
         services.AddMyAppAuthorization();
@@ -62,6 +70,7 @@ public static class AuthServiceCollectionExtensions
         services.AddAuthorization();
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddSingleton<IAuthorizationHandler, ResourcePermissionHandler>();
         return services;
     }
 }

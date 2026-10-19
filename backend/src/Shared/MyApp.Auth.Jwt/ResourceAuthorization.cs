@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.JsonWebTokens;
 
-namespace MyApp.Features.Auth.Authorization;
+namespace MyApp.Auth.Jwt;
 
 public interface IOwnedResource
 {
@@ -21,6 +21,9 @@ public sealed class ResourcePermissionRequirement : IAuthorizationRequirement
     }
 }
 
+/// <summary>
+/// JWT permission claim + optional ownership (sub == OwnerId). Admin role bypasses ownership.
+/// </summary>
 public sealed class ResourcePermissionHandler
     : AuthorizationHandler<ResourcePermissionRequirement, IOwnedResource>
 {
@@ -30,7 +33,7 @@ public sealed class ResourcePermissionHandler
         IOwnedResource resource)
     {
         var hasPermission = context.User.HasClaim(c =>
-            c.Type == AuthClaims.Permission &&
+            c.Type == AuthClaimTypes.Permission &&
             c.Value.Equals(requirement.Permission, StringComparison.OrdinalIgnoreCase));
 
         if (!hasPermission)
@@ -42,7 +45,6 @@ public sealed class ResourcePermissionHandler
             return Task.CompletedTask;
         }
 
-        // Admin / manager override via role.
         if (context.User.IsInRole(Roles.Admin))
         {
             context.Succeed(requirement);

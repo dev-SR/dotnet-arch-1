@@ -1,4 +1,13 @@
+using System.Security.Claims;
+using Microsoft.IdentityModel.JsonWebTokens;
+
 namespace MyApp.Auth.Jwt;
+
+public static class Roles
+{
+    public const string User = "User";
+    public const string Admin = "Admin";
+}
 
 /// <summary>Permission strings — also used as ASP.NET policy names via PermissionPolicyProvider.</summary>
 public static class Permissions
@@ -40,4 +49,10 @@ public static class AuthClaimTypes
     public const string TokenVersion = "token_version";
     public const string Permission = "permission";
     public const string Amr = "amr";
+}
+
+public static class ClaimsPrincipalExtensions
+{
+    public static Guid GetUserId(this ClaimsPrincipal p) =>
+        Guid.Parse(p.FindFirstValue(JwtRegisteredClaimNames.Sub)!);
 }

@@ -47,7 +47,7 @@ public static class ApiServiceCollectionExtensions
                     .RequireAuthenticatedUser()
                     .Build();
 
-                options.AddPolicy(Policies.AdminOnly, p => p.RequireRole(Roles.Admin));
+                options.AddPolicy(Policies.AdminOnly, p => p.RequireRole(MyApp.Features.Auth.Roles.Admin));
 
                 options.AddPolicy(Policies.WorkingHours, p =>
                     p.Requirements.Add(new WorkingHoursRequirement(9, 18)));
@@ -58,7 +58,7 @@ public static class ApiServiceCollectionExtensions
 
             services.AddSingleton<IAuthorizationHandler, WorkingHoursHandler>();
             services.AddSingleton<IAuthorizationHandler, EnhancedSecurityHandler>();
-            services.AddSingleton<IAuthorizationHandler, ResourcePermissionHandler>();
+            // ResourcePermissionHandler is registered by AddMyAppAuth (InvoicesApi ownership).
 
             return services;
         }

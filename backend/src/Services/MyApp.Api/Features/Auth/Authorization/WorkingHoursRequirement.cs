@@ -24,7 +24,7 @@ public sealed class WorkingHoursHandler : AuthorizationHandler<WorkingHoursRequi
         AuthorizationHandlerContext context,
         WorkingHoursRequirement requirement)
     {
-        // Demo override: X-Demo-Hour: 0-23 bypasses wall clock (tests / Scalar demos).
+        // Demo override: X-Demo-Hour: 0-23 bypasses wall clock (tests / API demos).
         var http = context.Resource as HttpContext;
         if (http?.Request.Headers.TryGetValue("X-Demo-Hour", out var demo) == true
             && int.TryParse(demo.ToString(), out var hour)

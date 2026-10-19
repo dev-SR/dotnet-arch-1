@@ -10,7 +10,8 @@ using MyApp.Persistence;
 
 namespace MyApp.Tests.Integration;
 
-public class MyAppFactory : WebApplicationFactory<Program>
+// AppDbContext (not Program) — test project also references InvoicesApi, which has its own Program.
+public class MyAppFactory : WebApplicationFactory<AppDbContext>
 {
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
     private readonly Dictionary<string, string?> _configOverrides;

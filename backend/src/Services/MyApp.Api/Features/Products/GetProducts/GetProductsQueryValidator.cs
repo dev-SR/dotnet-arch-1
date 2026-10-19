@@ -13,9 +13,11 @@ public sealed class GetProductsQueryValidator : AbstractValidator<GetProductsQue
 
     public GetProductsQueryValidator()
     {
-        RuleFor(x => x.Filter.Page).GreaterThanOrEqualTo(1).OverridePropertyName("page");
+        RuleFor(x => x.Filter.Page).GreaterThanOrEqualTo(1)
+            .When(x => x.Filter.Page.HasValue).OverridePropertyName("page");
         RuleFor(x => x.Filter.PageSize)
-            .InclusiveBetween(1, PagedQueryExtensions.MaxPageSize).OverridePropertyName("pageSize");
+            .InclusiveBetween(1, PagedQueryExtensions.MaxPageSize)
+            .When(x => x.Filter.PageSize.HasValue).OverridePropertyName("pageSize");
         RuleFor(x => x.Filter.OrderBy)
             .Must(o => Sortable.Contains(o, StringComparer.OrdinalIgnoreCase))
             .When(x => !string.IsNullOrWhiteSpace(x.Filter.OrderBy))

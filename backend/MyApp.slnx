@@ -3,7 +3,7 @@
   <Folder Name="/src/Services/">
     <Project Path="src/Services/MyApp.Api/MyApp.Api.csproj" />
     <Project Path="src/Services/MyApp.Gateway/MyApp.Gateway.csproj" />
-    <Project Path="src/Services/MyApp.ProductsApi/MyApp.ProductsApi.csproj" />
+    <Project Path="src/Services/MyApp.InvoicesApi/MyApp.InvoicesApi.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/Mediator/Mediator.csproj" />

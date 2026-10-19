@@ -1,6 +1,6 @@
-using MyApp.Features.Auth.Authorization;
+using MyApp.Auth.Jwt;
 
-namespace MyApp.Features.Invoices;
+namespace MyApp.InvoicesApi;
 
 public sealed class Invoice : IOwnedResource
 {

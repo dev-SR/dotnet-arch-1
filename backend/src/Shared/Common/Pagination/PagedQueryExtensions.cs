@@ -15,8 +15,8 @@ public static class PagedQueryExtensions
         // Normalize once; the SAME values are used for Skip/Take and echoed in the result —
         // a caller who asked for pageSize=99999 gets back a result that honestly says
         // pageSize: 100, not one that silently clamped the query but claimed otherwise.
-        var page = Math.Max(1, request.Page);
-        var size = Math.Clamp(request.PageSize, 1, MaxPageSize);
+        var page = Math.Max(1, request.Page ?? 1);
+        var size = Math.Clamp(request.PageSize ?? 20, 1, MaxPageSize);
 
         // long arithmetic avoids (page - 1) * size overflowing int and wrapping negative
         // for a very large page number, which used to throw from Queryable.Skip.

@@ -4,14 +4,16 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>MyApp.ProductsApi</RootNamespace>
+    <RootNamespace>MyApp.InvoicesApi</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Common\Shared.Common.csproj" />
     <ProjectReference Include="..\..\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
   </ItemGroup>
 
