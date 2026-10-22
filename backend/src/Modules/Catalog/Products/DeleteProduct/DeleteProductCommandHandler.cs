@@ -22,6 +22,7 @@ internal sealed class DeleteProductCommandHandler(
                 $"Product '{command.Id}' was not found.");
         }
 
+        // Hard delete (API contract: GET after DELETE → 404). Soft-delete via MarkDeleted remains available.
         dbContext.Products.Remove(product);
         logger.LogInformation("Product {ProductId} deleted", product.Id);
         return default(Success);

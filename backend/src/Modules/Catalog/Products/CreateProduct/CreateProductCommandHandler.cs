@@ -14,20 +14,21 @@ internal sealed class CreateProductCommandHandler(
         CreateProductCommand command,
         CancellationToken cancellationToken)
     {
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            Name = command.Name,
-            Price = command.Price,
-            Stock = command.Stock,
-            CreatedAt = DateTime.UtcNow,
-            Category = new Category { Name = command.Category },
-            Brand = new Brand { Name = "Generic" },
-        };
+        var created = Product.Create(
+            command.Name,
+            command.Price,
+            command.Stock,
+            new Category { Name = command.Category },
+            new Brand { Name = "Generic" });
+
+        if (created.IsError)
+            return ValueTask.FromResult(ErrorOr<Guid>.From(created.Errors.ToList()));
+
+        var product = created.Value;
         dbContext.Products.Add(product);
 
-        // SaveChanges is handled by TransactionBehavior
-        logger.LogInformation("Product {ProductId} created", product.Id);
+        // SaveChanges is handled by TransactionBehavior (audit + domain events via interceptors)
+        logger.LogInformation("Product {ProductId} queued for create", product.Id);
         return ValueTask.FromResult<ErrorOr<Guid>>(product.Id);
     }
 }

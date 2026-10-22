@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MyApp.Modules.Orders.Persistence;
@@ -17,7 +18,12 @@ public static class DependencyInjection
         var cs = configuration.GetConnectionString("Orders")
                  ?? "Data Source=orders.db";
 
-        services.AddDbContext<OrdersDbContext>(options => options.UseSqlite(cs));
+        services.AddDbContext<OrdersDbContext>((sp, options) =>
+        {
+            options.UseSqlite(cs);
+            options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
+        });
+
         return services;
     }
 }

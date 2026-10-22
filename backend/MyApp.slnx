@@ -19,6 +19,9 @@
   <Folder Name="/src/Shared/Common/">
     <Project Path="src/Shared/Common/Shared.Common.csproj" />
   </Folder>
+  <Folder Name="/src/Shared/Domain/">
+    <Project Path="src/Shared/Domain/Shared.Domain.csproj" />
+  </Folder>
   <Folder Name="/src/Shared/MyApp.Auth.Jwt/">
     <Project Path="src/Shared/MyApp.Auth.Jwt/MyApp.Auth.Jwt.csproj" />
   </Folder>

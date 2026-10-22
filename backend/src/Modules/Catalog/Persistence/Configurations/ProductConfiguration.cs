@@ -8,8 +8,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
     public void Configure(EntityTypeBuilder<Product> b)
     {
+        b.Ignore(p => p.DomainEvents);
         b.Property(p => p.Name).HasMaxLength(200).IsRequired();
         b.Property(p => p.Price).HasPrecision(18, 2);
+        b.Property(p => p.CreatedBy).HasMaxLength(256);
+        b.Property(p => p.LastModifiedBy).HasMaxLength(256);
 
         b.HasOne(p => p.Category).WithMany(c => c.Products).HasForeignKey(p => p.CategoryId);
         b.HasOne(p => p.Brand).WithMany(br => br.Products).HasForeignKey(p => p.BrandId);

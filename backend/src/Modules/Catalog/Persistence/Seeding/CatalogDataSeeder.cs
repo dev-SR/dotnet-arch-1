@@ -1,5 +1,6 @@
 using Bogus;
 using Microsoft.EntityFrameworkCore;
+using MyApp.Modular;
 using MyApp.Modules.Catalog.Brands;
 using MyApp.Modules.Catalog.Categories;
 using MyApp.Modules.Catalog.Products;
@@ -8,9 +9,9 @@ using MyApp.Modules.Catalog.Tags;
 
 namespace MyApp.Modules.Catalog.Persistence.Seeding;
 
-public static class CatalogDataSeeder
+public sealed class CatalogDataSeeder(CatalogDbContext db) : IDataSeeder
 {
-    public static async Task SeedAsync(CatalogDbContext db, CancellationToken ct = default)
+    public async Task SeedAsync(CancellationToken ct = default)
     {
         if (await db.Products.AnyAsync(ct))
             return;
@@ -38,24 +39,42 @@ public static class CatalogDataSeeder
             .DistinctBy(t => t.Name)
             .ToList();
 
-        // CustomerIds are opaque GUIDs (Users module owns Customer rows — no cross-DB FK).
         var customerIds = Enumerable.Range(0, 100).Select(_ => Guid.NewGuid()).ToList();
 
-        var products = new Faker<Product>()
-            .RuleFor(p => p.Id, f => f.Random.Guid())
-            .RuleFor(p => p.Name, f => f.Commerce.ProductName())
-            .RuleFor(p => p.Description, f => f.Commerce.ProductDescription())
-            .RuleFor(p => p.Price, f => f.Random.Decimal(5, 2000))
-            .RuleFor(p => p.StockQuantity, f => f.Random.Int(0, 500))
-            .RuleFor(p => p.IsActive, f => f.Random.Bool(0.9f))
-            .RuleFor(p => p.IsDeleted, f => f.Random.Bool(0.03f))
-            .RuleFor(p => p.CreatedAt, f => f.Date.Past(2))
-            .RuleFor(p => p.CategoryId, f => f.PickRandom(categories).Id)
-            .RuleFor(p => p.BrandId, f => f.PickRandom(brands).Id)
-            .Generate(600);
+        var products = new List<Product>(600);
+        var faker = new Faker();
+        for (var i = 0; i < 600; i++)
+        {
+            var name = faker.Commerce.ProductName();
+            if (name.Length < 3)
+                name = name.PadRight(3, 'x');
 
-        foreach (var p in products)
-            p.Tags = tags.OrderBy(_ => random.Next()).Take(random.Next(1, 5)).ToList();
+            var created = Product.Create(
+                name,
+                faker.Random.Decimal(5, 2000),
+                faker.Random.Int(0, 500),
+                faker.PickRandom(categories),
+                faker.PickRandom(brands));
+
+            if (created.IsError)
+                continue;
+
+            var product = created.Value;
+            product.ClearDomainEvents();
+
+            var seedTags = tags.OrderBy(_ => random.Next()).Take(random.Next(1, 5)).ToList();
+            var isActive = faker.Random.Bool(0.9f);
+            product.ConfigureForSeed(
+                faker.Commerce.ProductDescription(),
+                faker.Date.Past(2),
+                isActive,
+                seedTags);
+
+            if (faker.Random.Bool(0.03f))
+                _ = product.MarkDeleted();
+
+            products.Add(product);
+        }
 
         var reviews = new List<Review>();
         var reviewFaker = new Faker<Review>()

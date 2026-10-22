@@ -12,6 +12,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.Email).HasMaxLength(256).IsRequired();
         b.Property(x => x.NormalizedEmail).HasMaxLength(256).IsRequired();
         b.Property(x => x.PasswordHash).IsRequired();
+        b.Property(x => x.CreatedBy).HasMaxLength(256);
+        b.Property(x => x.LastModifiedBy).HasMaxLength(256);
         b.HasIndex(x => x.NormalizedEmail).IsUnique();
         b.HasMany(x => x.UserRoles).WithOne(x => x.User).HasForeignKey(x => x.UserId);
         // RefreshTokens relationship configured only in RefreshTokenConfiguration

@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MyApp.Modular;
 using MyApp.Modules.Users.Auth;
 using MyApp.Modules.Users.Auth.Authorization;
 using MyApp.Modules.Users.Persistence;
+using MyApp.Modules.Users.Persistence.Seeding;
 
 namespace MyApp.Modules.Users;
 
@@ -21,7 +24,11 @@ public static class DependencyInjection
         var cs = configuration.GetConnectionString("Users")
                  ?? "Data Source=users.db";
 
-        services.AddDbContext<UsersDbContext>(options => options.UseSqlite(cs));
+        services.AddDbContext<UsersDbContext>((sp, options) =>
+        {
+            options.UseSqlite(cs);
+            options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
+        });
 
         services.AddOptions<SeedOptions>()
             .BindConfiguration(SeedOptions.Section)
@@ -43,6 +50,8 @@ public static class DependencyInjection
         });
         services.AddSingleton<IAuthorizationHandler, WorkingHoursHandler>();
         services.AddSingleton<IAuthorizationHandler, EnhancedSecurityHandler>();
+
+        services.AddScoped<IDataSeeder, UsersDataSeeder>();
 
         return services;
     }

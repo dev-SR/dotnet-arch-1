@@ -2,6 +2,7 @@ using Carter;
 using DotNetEnv;
 using MyApp.Application;
 using MyApp.Infrastructure;
+using MyApp.Modular;
 using MyApp.Modules.Catalog;
 using MyApp.Modules.Orders;
 using MyApp.Modules.Users;
@@ -14,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration)
+    .AddModularEfCore()
     .AddApi(builder.Configuration)
     .AddUsersModule(builder.Configuration)
     .AddOrdersModule(builder.Configuration)
@@ -26,6 +28,7 @@ app.UseSharedPipeline();
 app.UseUsersModule();
 app.UseOrdersModule();
 app.UseCatalogModule();
+app.UseDevelopmentSeeders();
 app.MapCarter();
 
 app.Run();

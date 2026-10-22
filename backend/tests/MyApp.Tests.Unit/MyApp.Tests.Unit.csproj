@@ -32,5 +32,6 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\Shared\Common\Shared.Common.csproj" />
         <ProjectReference Include="..\..\src\Shared\Application\Shared.Application.csproj" />
+        <ProjectReference Include="..\..\src\Modules\Catalog\Catalog.csproj" />
     </ItemGroup>
 </Project>

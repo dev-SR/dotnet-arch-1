@@ -1,8 +1,9 @@
+using Shared.Domain;
+
 namespace MyApp.Modules.Users.Auth;
 
-public sealed class User
+public sealed class User : Entity
 {
-    public Guid Id { get; init; } = Guid.NewGuid();
     public required string Email { get; set; }
     public required string NormalizedEmail { get; set; }
     public required string PasswordHash { get; set; }
@@ -11,7 +12,6 @@ public sealed class User
     public int PermissionVersion { get; set; } = 1;
     public int AccessFailedCount { get; set; }
     public DateTimeOffset? LockoutEnd { get; set; }
-    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public List<UserRole> UserRoles { get; set; } = [];
     public List<RefreshToken> RefreshTokens { get; set; } = [];
 }

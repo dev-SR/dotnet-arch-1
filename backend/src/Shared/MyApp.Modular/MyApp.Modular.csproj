@@ -19,4 +19,9 @@
     <PackageReference Include="Microsoft.Extensions.DependencyModel" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Domain\Shared.Domain.csproj" />
+    <ProjectReference Include="..\Mediator\Mediator.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -22,10 +22,9 @@ internal sealed class UpdateProductCommandHandler(
                 $"Product '{command.Id}' was not found.");
         }
 
-        product.Name = command.Name;
-        product.Category.Name = command.Category;
-        product.Price = command.Price;
-        product.Stock = command.Stock;
+        var updated = product.UpdateDetails(command.Name, command.Price, command.Stock, command.Category);
+        if (updated.IsError)
+            return ErrorOr<Success>.From(updated.Errors.ToList());
 
         logger.LogInformation("Product {ProductId} updated", product.Id);
         return default(Success);

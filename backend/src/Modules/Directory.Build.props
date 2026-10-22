@@ -26,6 +26,7 @@
     <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\Mediator\Mediator.csproj" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\Application\Shared.Application.csproj" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\Common\Shared.Common.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\Domain\Shared.Domain.csproj" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\MyApp.Modular\MyApp.Modular.csproj" />
   </ItemGroup>

@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MyApp.Modular;
 using MyApp.Modules.Catalog.Persistence;
-using MyApp.Modules.Catalog.Persistence.Seeding;
 
 namespace MyApp.Modules.Catalog;
 
@@ -27,10 +25,6 @@ public static class CatalogModule
             throw;
         }
 
-        if (!app.Environment.IsDevelopment())
-            return app;
-
-        CatalogDataSeeder.SeedAsync(db).GetAwaiter().GetResult();
         return app;
     }
 }

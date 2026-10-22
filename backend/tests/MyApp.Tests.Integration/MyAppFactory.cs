@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,7 +80,11 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
         services.RemoveAll<DbContextOptions<TContext>>();
         services.RemoveAll<IDbContextOptionsConfiguration<TContext>>();
         services.RemoveAll<TContext>();
-        services.AddDbContext<TContext>(options => options.UseSqlite(connection));
+        services.AddDbContext<TContext>((sp, options) =>
+        {
+            options.UseSqlite(connection);
+            options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
+        });
     }
 
     protected override void Dispose(bool disposing)

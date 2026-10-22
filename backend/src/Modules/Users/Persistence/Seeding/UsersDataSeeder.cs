@@ -1,29 +1,27 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MyApp.Modular;
 using MyApp.Modules.Users.Auth;
 using MyApp.Modules.Users.Customers;
 using MyApp.Modules.Users.Persistence.Configurations;
 
 namespace MyApp.Modules.Users.Persistence.Seeding;
 
-public static class UsersDataSeeder
+public sealed class UsersDataSeeder(
+    UsersDbContext db,
+    IOptions<SeedOptions> seedOptions,
+    IPasswordHasher<User> passwordHasher) : IDataSeeder
 {
-    public static async Task SeedAsync(
-        UsersDbContext db,
-        SeedOptions options,
-        IPasswordHasher<User> passwordHasher,
-        CancellationToken ct = default)
+    public async Task SeedAsync(CancellationToken ct = default)
     {
-        await SeedAdminAsync(db, options, passwordHasher, ct);
-        await SeedUserAsync(db, options, passwordHasher, ct);
-        await SeedCustomersAsync(db, ct);
+        var options = seedOptions.Value;
+        await SeedAdminAsync(options, ct);
+        await SeedUserAsync(options, ct);
+        await SeedCustomersAsync(ct);
     }
 
-    private static async Task SeedAdminAsync(
-        UsersDbContext db,
-        SeedOptions options,
-        IPasswordHasher<User> passwordHasher,
-        CancellationToken ct)
+    private async Task SeedAdminAsync(SeedOptions options, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(options.AdminEmail) ||
             string.IsNullOrWhiteSpace(options.AdminPassword))
@@ -47,11 +45,7 @@ public static class UsersDataSeeder
         await db.SaveChangesAsync(ct);
     }
 
-    private static async Task SeedUserAsync(
-        UsersDbContext db,
-        SeedOptions options,
-        IPasswordHasher<User> passwordHasher,
-        CancellationToken ct)
+    private async Task SeedUserAsync(SeedOptions options, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(options.UserEmail) ||
             string.IsNullOrWhiteSpace(options.UserPassword))
@@ -74,7 +68,7 @@ public static class UsersDataSeeder
         await db.SaveChangesAsync(ct);
     }
 
-    private static async Task SeedCustomersAsync(UsersDbContext db, CancellationToken ct)
+    private async Task SeedCustomersAsync(CancellationToken ct)
     {
         if (await db.Customers.AnyAsync(ct))
             return;

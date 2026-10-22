@@ -33,7 +33,7 @@ internal sealed class GetProductsQueryHandler(CatalogDbContext dbContext)
                 StockQuantity = p.StockQuantity,
                 CategoryName = p.Category.Name,
                 BrandName = p.Brand.Name,
-                CreatedAt = p.CreatedAt,
+                CreatedAt = p.CreatedAt ?? default,
             });
         var page = await projected.ToPagedAsync(pagedFilter, ct);
         return new PagedResponse<ProductListItemDto>(page.Items, page.TotalCount, page.Page, page.PageSize);
