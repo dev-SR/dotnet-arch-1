@@ -29,6 +29,7 @@
     <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\Domain\Shared.Domain.csproj" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\MyApp.Modular\MyApp.Modular.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\MyApp.Messaging\MyApp.Messaging.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyApp.Modular;
 using MyApp.Modules.Catalog.Persistence;
 using MyApp.Modules.Catalog.Persistence.Seeding;
+using Shared.Application.Persistence;
 
 namespace MyApp.Modules.Catalog;
 
@@ -20,7 +21,7 @@ public static class DependencyInjection
         var cs = configuration.GetConnectionString("Catalog")
                  ?? "Data Source=catalog.db";
 
-        services.AddDbContext<CatalogDbContext>((sp, options) =>
+        services.AddTransactionalDbContext<CatalogDbContext>((sp, options) =>
         {
             options.UseSqlite(cs);
             options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());

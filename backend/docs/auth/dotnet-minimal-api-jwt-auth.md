@@ -773,7 +773,7 @@ public sealed class TokenService : ITokenService
 
 ## Step 5: Vertical slices (Command + Validator + Handler + Endpoint)
 
-Mirror Products — each use case is one folder with **Command, Validator, Handler, and Carter Endpoint**. Handlers return `ValueTask<ErrorOr<T>>`. Input validation is **only** in FluentValidation. Endpoints only `Send` + `Match*`. `SaveChanges` follows [`TransactionBehavior`](../../src/Services/MyApp.Api/Persistence/TransactionBehavior.cs).
+Mirror Products — each use case is one folder with **Command, Validator, Handler, and Carter Endpoint**. Handlers return `ValueTask<ErrorOr<T>>`. Input validation is **only** in FluentValidation. Endpoints only `Send` + `Match*`. `SaveChanges` follows [`TransactionBehavior`](../../src/Shared/Application/Behaviors/TransactionBehavior.cs) (also used by InvoicesApi with one DbContext; no MyApp.Modular required).
 
 #### How `TransactionBehavior` decides to commit
 
@@ -2005,7 +2005,7 @@ Integration tests in [`MyApp.Tests.Integration/AuthSecurityTests.cs`](../../test
 - Commands commit only when successful **or** when the command implements `IPersistOnFailure` (`LoginCommand`, `RefreshTokenCommand`).
 - Unique violations map to `DB.CONFLICT` (409).
 - Failure-path lockout / family revoke use `ExecuteUpdateAsync` so they are not lost on ErrorOr returns.
-- Markers: `IErrorOr`, `ICommandMarker`, `IPersistOnFailure` in Shared; see [`TransactionBehavior.cs`](../../src/Services/MyApp.Api/Persistence/TransactionBehavior.cs).
+- Markers: `IErrorOr`, `ICommandMarker`, `IPersistOnFailure` in Shared; see [`TransactionBehavior.cs`](../../src/Shared/Application/Behaviors/TransactionBehavior.cs). Register contexts with `AddTransactionalDbContext<T>` so the behavior discovers them via `IEnumerable<DbContext>`.
 
 **Quick usage checklist**
 

@@ -16,21 +16,37 @@ namespace MyApp.Tests.Integration;
 
 /// <summary>
 /// Host factory for ApiHost. Uses <see cref="AssemblyMarker"/> because InvoicesApi also has a Program.
+/// File-based temp SQLite — Wolverine durability rejects in-memory databases.
 /// </summary>
 public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
 {
-    private readonly SqliteConnection _users = new("DataSource=:memory:");
-    private readonly SqliteConnection _catalog = new("DataSource=:memory:");
-    private readonly SqliteConnection _orders = new("DataSource=:memory:");
+    private readonly string _usersPath;
+    private readonly string _catalogPath;
+    private readonly string _ordersPath;
+    private readonly string _usersCs;
+    private readonly string _catalogCs;
+    private readonly string _ordersCs;
     private readonly Dictionary<string, string?> _configOverrides;
 
     public MyAppFactory()
     {
+        var id = Guid.NewGuid().ToString("N");
+        _usersPath = Path.Combine(Path.GetTempPath(), $"myapp-users-{id}.db");
+        _catalogPath = Path.Combine(Path.GetTempPath(), $"myapp-catalog-{id}.db");
+        _ordersPath = Path.Combine(Path.GetTempPath(), $"myapp-orders-{id}.db");
+        _usersCs = $"Data Source={_usersPath}";
+        _catalogCs = $"Data Source={_catalogPath}";
+        _ordersCs = $"Data Source={_ordersPath}";
+
+        Environment.SetEnvironmentVariable("ConnectionStrings__Users", _usersCs);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Catalog", _catalogCs);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Orders", _ordersCs);
+
         _configOverrides = new Dictionary<string, string?>();
-        _users.Open();
-        _catalog.Open();
-        _orders.Open();
     }
+
+    public string CatalogConnectionString => _catalogCs;
+    public string OrdersConnectionString => _ordersCs;
 
     public static MyAppFactory WithConfig(Dictionary<string, string?> overrides)
     {
@@ -43,6 +59,9 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("ConnectionStrings:Users", _usersCs);
+        builder.UseSetting("ConnectionStrings:Catalog", _catalogCs);
+        builder.UseSetting("ConnectionStrings:Orders", _ordersCs);
 
         builder.ConfigureAppConfiguration((_, config) =>
         {
@@ -57,9 +76,9 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
                 ["RateLimit:AuthPerMinute"] = "100",
                 ["Seed:AdminEmail"] = "",
                 ["Seed:AdminPassword"] = "",
-                ["ConnectionStrings:Users"] = "Data Source=:memory:",
-                ["ConnectionStrings:Catalog"] = "Data Source=:memory:",
-                ["ConnectionStrings:Orders"] = "Data Source=:memory:",
+                ["ConnectionStrings:Users"] = _usersCs,
+                ["ConnectionStrings:Catalog"] = _catalogCs,
+                ["ConnectionStrings:Orders"] = _ordersCs,
             };
             foreach (var (k, v) in _configOverrides)
                 defaults[k] = v;
@@ -68,13 +87,20 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
 
         builder.ConfigureServices(services =>
         {
-            ReplaceDbContext<UsersDbContext>(services, _users);
-            ReplaceDbContext<CatalogDbContext>(services, _catalog);
-            ReplaceDbContext<OrdersDbContext>(services, _orders);
+            foreach (var d in services.Where(x => x.ServiceType == typeof(DbContext)).ToList())
+                services.Remove(d);
+
+            ReplaceDbContext<UsersDbContext>(services, _usersCs);
+            ReplaceDbContext<CatalogDbContext>(services, _catalogCs);
+            ReplaceDbContext<OrdersDbContext>(services, _ordersCs);
+
+            services.AddScoped<DbContext>(sp => sp.GetRequiredService<UsersDbContext>());
+            services.AddScoped<DbContext>(sp => sp.GetRequiredService<CatalogDbContext>());
+            services.AddScoped<DbContext>(sp => sp.GetRequiredService<OrdersDbContext>());
         });
     }
 
-    private static void ReplaceDbContext<TContext>(IServiceCollection services, SqliteConnection connection)
+    private static void ReplaceDbContext<TContext>(IServiceCollection services, string connectionString)
         where TContext : DbContext
     {
         services.RemoveAll<DbContextOptions<TContext>>();
@@ -82,7 +108,7 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
         services.RemoveAll<TContext>();
         services.AddDbContext<TContext>((sp, options) =>
         {
-            options.UseSqlite(connection);
+            options.UseSqlite(connectionString);
             options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
         });
     }
@@ -91,10 +117,23 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
     {
         if (disposing)
         {
-            _users.Dispose();
-            _catalog.Dispose();
-            _orders.Dispose();
+            TryDelete(_usersPath);
+            TryDelete(_catalogPath);
+            TryDelete(_ordersPath);
         }
         base.Dispose(disposing);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+            // best-effort cleanup
+        }
     }
 }

@@ -25,6 +25,9 @@
   <Folder Name="/src/Shared/MyApp.Auth.Jwt/">
     <Project Path="src/Shared/MyApp.Auth.Jwt/MyApp.Auth.Jwt.csproj" />
   </Folder>
+  <Folder Name="/src/Shared/MyApp.Messaging/">
+    <Project Path="src/Shared/MyApp.Messaging/MyApp.Messaging.csproj" />
+  </Folder>
   <Folder Name="/src/Shared/MyApp.Modular/">
     <Project Path="src/Shared/MyApp.Modular/MyApp.Modular.csproj" />
   </Folder>

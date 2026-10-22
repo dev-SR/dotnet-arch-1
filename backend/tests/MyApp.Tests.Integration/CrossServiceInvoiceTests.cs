@@ -6,6 +6,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MyApp.InvoicesApi;
 using MyApp.Modules.Users.Auth;
 using MyApp.Modules.Users.Persistence;
 using MyApp.Modules.Users.Persistence.Configurations;
@@ -114,6 +115,30 @@ public class CrossServiceInvoiceTests : IClassFixture<MyAppFactory>, IClassFixtu
         problem.GetProperty("errorCode").GetString().Should().Be("VALIDATION");
         problem.TryGetProperty("errors", out var errors).Should().BeTrue();
         errors.EnumerateObject().Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateInvoice_Invalid_Does_Not_Persist()
+    {
+        await AuthenticateInvoicesAsAdminAsync();
+        var before = await CountInvoicesAsync();
+        var response = await _invoices.PostAsJsonAsync("/invoices", new { number = "", amount = 0m });
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CountInvoicesAsync()).Should().Be(before);
+    }
+
+    [Fact]
+    public async Task CreateInvoice_Duplicate_Number_Returns_Conflict()
+    {
+        await AuthenticateInvoicesAsAdminAsync();
+        var number = $"DUP-{Guid.NewGuid():N}"[..12];
+        (await _invoices.PostAsJsonAsync("/invoices", new { number, amount = 10m }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var dup = await _invoices.PostAsJsonAsync("/invoices", new { number, amount = 20m });
+        dup.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemAsync(dup)).GetProperty("errorCode").GetString()
+            .Should().Be("DB.CONFLICT");
     }
 
     [Fact]
@@ -271,6 +296,13 @@ public class CrossServiceInvoiceTests : IClassFixture<MyAppFactory>, IClassFixtu
             .Where(u => u.NormalizedEmail == email.ToUpperInvariant())
             .Select(u => u.Id)
             .SingleAsync();
+    }
+
+    private async Task<int> CountInvoicesAsync()
+    {
+        using var scope = _invoicesFactory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<InvoicesDbContext>();
+        return await db.Invoices.CountAsync();
     }
 
     private sealed record RoleDto(Guid Id, string Name, string NormalizedName);

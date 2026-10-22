@@ -1,9 +1,13 @@
 using System.Security.Claims;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using MyApp.Auth.Jwt;
 using MyApp.InvoicesApi;
+using MyApp.InvoicesApi.CreateInvoice;
+using Shared.Application.Behaviors;
+using Shared.Application.Persistence;
 using Shared.Common.Errors;
 using Shared.Common.Errors.Http;
 using Shared.Common.Exceptions.Http;
@@ -21,9 +25,12 @@ builder.Services.AddAuthorization(options =>
         .Build();
 });
 
-builder.Services.AddDbContext<InvoicesDbContext>(o =>
+builder.Services.AddTransactionalDbContext<InvoicesDbContext>((_, o) =>
     o.UseSqlite(builder.Configuration.GetConnectionString("Invoices")
                 ?? "Data Source=invoices.db"));
+
+builder.Services.RegisterRequestHandlers(typeof(AssemblyMarker).Assembly);
+builder.Services.AddPipelineBehavior(typeof(TransactionBehavior<,>));
 
 builder.Services.AddOpenApi(options =>
 {
@@ -90,38 +97,18 @@ var group = app.MapGroup("/invoices")
     .WithTags("Invoices");
 
 // Create needs Edit claim (no separate Create permission in the IAM seed).
+// Demonstrates microservice use of Shared.Application TransactionBehavior (no MyApp.Modular).
 group.MapPost("/", async (
     CreateInvoiceBody body,
     ClaimsPrincipal user,
-    InvoicesDbContext db,
+    IMediator mediator,
     HttpContext http,
     CancellationToken ct) =>
 {
-    var validation = ValidateInvoice(body.Number, body.Amount);
-    if (validation is not null)
-        return validation.ToProblem(http);
-
-    var invoice = new Invoice
-    {
-        OwnerId = user.GetUserId(),
-        Number = body.Number.Trim(),
-        Amount = body.Amount,
-    };
-    db.Invoices.Add(invoice);
-
-    try
-    {
-        await db.SaveChangesAsync(ct);
-    }
-    catch (DbUpdateException)
-    {
-        return Error.Conflict(
-                "INVOICE.NUMBER_EXISTS",
-                $"Invoice number '{invoice.Number}' already exists.")
-            .ToProblem(http);
-    }
-
-    return Results.Created($"/invoices/{invoice.Id}", invoice);
+    var result = await mediator.Send(
+        new CreateInvoiceCommand(body.Number, body.Amount, user.GetUserId()),
+        ct);
+    return result.MatchCreated(http, inv => $"/invoices/{inv.Id}");
 }).RequireAuthorization(Permissions.Invoices.Edit);
 
 group.MapGet("/{id:guid}", async (

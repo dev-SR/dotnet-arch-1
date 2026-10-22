@@ -30,5 +30,6 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\Services\MyApp.ApiHost\MyApp.ApiHost.csproj" />
         <ProjectReference Include="..\..\src\Services\MyApp.InvoicesApi\MyApp.InvoicesApi.csproj" />
+        <ProjectReference Include="..\..\src\Shared\MyApp.Messaging\MyApp.Messaging.csproj" />
     </ItemGroup>
 </Project>

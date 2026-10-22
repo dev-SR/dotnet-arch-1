@@ -1,6 +1,5 @@
 using FluentValidation;
 using MyApp.ApiHost;
-using MyApp.ApiHost.Persistence;
 using MyApp.Modular;
 using Shared.Application.Behaviors;
 

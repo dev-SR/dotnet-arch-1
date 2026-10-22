@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MyApp.Modules.Orders.Persistence;
+using Shared.Application.Persistence;
 
 namespace MyApp.Modules.Orders;
 
@@ -18,7 +19,7 @@ public static class DependencyInjection
         var cs = configuration.GetConnectionString("Orders")
                  ?? "Data Source=orders.db";
 
-        services.AddDbContext<OrdersDbContext>((sp, options) =>
+        services.AddTransactionalDbContext<OrdersDbContext>((sp, options) =>
         {
             options.UseSqlite(cs);
             options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MyApp.Modules.Orders.Catalog;
 
 namespace MyApp.Modules.Orders.Persistence;
 
@@ -10,6 +11,7 @@ public sealed class OrdersDbContext(DbContextOptions<OrdersDbContext> options) :
 {
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<ProductCatalogItem> ProductCatalog => Set<ProductCatalogItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

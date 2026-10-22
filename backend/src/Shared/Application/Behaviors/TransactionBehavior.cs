@@ -1,19 +1,20 @@
+using Mediator;
 using Microsoft.EntityFrameworkCore;
-using MyApp.Modules.Catalog.Persistence;
-using MyApp.Modules.Orders.Persistence;
-using MyApp.Modules.Users.Persistence;
+using Microsoft.Extensions.Logging;
 using Shared.Application.Abstractions.Commands;
+using Shared.Application.Persistence;
 using Shared.Common.Errors;
 
-namespace MyApp.ApiHost.Persistence;
+namespace Shared.Application.Behaviors;
 
 /// <summary>
-/// Commits changes on whichever module DbContext(s) the handler touched.
+/// Commits changes on whichever <see cref="DbContext"/>(s) the handler touched.
+/// Hosts register contexts via <c>AddTransactionalDbContext&lt;T&gt;</c>.
+/// Optional <see cref="IDbContextCommitFlush"/> flushes messaging outboxes after save.
 /// </summary>
 public sealed class TransactionBehavior<TRequest, TResponse>(
-    UsersDbContext users,
-    CatalogDbContext catalog,
-    OrdersDbContext orders,
+    IEnumerable<DbContext> dbContexts,
+    IEnumerable<IDbContextCommitFlush> commitFlushes,
     ILogger<TransactionBehavior<TRequest, TResponse>> logger)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
@@ -24,7 +25,8 @@ public sealed class TransactionBehavior<TRequest, TResponse>(
     public async ValueTask<TResponse> Handle(
         TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
     {
-        var contexts = new DbContext[] { users, catalog, orders };
+        var contexts = dbContexts as DbContext[] ?? dbContexts.ToArray();
+        var flushes = commitFlushes as IDbContextCommitFlush[] ?? commitFlushes.ToArray();
         if (!IsCommand || contexts.Any(c => c.Database.CurrentTransaction is not null))
             return await next(ct);
 
@@ -38,11 +40,24 @@ public sealed class TransactionBehavior<TRequest, TResponse>(
                 return response;
             }
 
+            var saved = new List<DbContext>();
             foreach (var db in contexts.Where(c => c.ChangeTracker.HasChanges()))
             {
-                if (!db.Database.IsRelational())
+                // Wolverine IDbContextOutbox.Enroll may already open a transaction —
+                // never nest BeginTransaction; always Commit that ambient tx after SaveChanges
+                // or the whole unit of work (business + outbox rows) is rolled back on dispose.
+                if (db.Database.CurrentTransaction is not null)
                 {
                     await db.SaveChangesAsync(ct);
+                    await db.Database.CurrentTransaction.CommitAsync(ct);
+                    saved.Add(db);
+                    continue;
+                }
+
+                if (flushes.Length > 0 || !db.Database.IsRelational())
+                {
+                    await db.SaveChangesAsync(ct);
+                    saved.Add(db);
                     continue;
                 }
 
@@ -53,7 +68,11 @@ public sealed class TransactionBehavior<TRequest, TResponse>(
                     await db.SaveChangesAsync(ct);
                     await tx.CommitAsync(ct);
                 });
+                saved.Add(db);
             }
+
+            foreach (var db in saved)
+                await FlushAsync(db, flushes, ct);
 
             return response;
         }
@@ -63,6 +82,13 @@ public sealed class TransactionBehavior<TRequest, TResponse>(
             return ErrorOrFactory.Failure<TResponse>(
                 [Error.Conflict("DB.CONFLICT", "The resource already exists or was changed by another request.")]);
         }
+    }
+
+    private static async Task FlushAsync(
+        DbContext db, IReadOnlyList<IDbContextCommitFlush> flushes, CancellationToken ct)
+    {
+        foreach (var flush in flushes)
+            await flush.AfterSaveChangesAsync(db, ct);
     }
 
     private static bool ShouldCommit(TResponse response) =>

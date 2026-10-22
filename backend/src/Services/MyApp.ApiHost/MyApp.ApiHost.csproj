@@ -44,6 +44,7 @@
       <ProjectReference Include="..\..\Shared\Common\Shared.Common.csproj" />
       <ProjectReference Include="..\..\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
       <ProjectReference Include="..\..\Shared\MyApp.Modular\MyApp.Modular.csproj" />
+      <ProjectReference Include="..\..\Shared\MyApp.Messaging\MyApp.Messaging.csproj" />
       <ProjectReference Include="..\..\Modules\Users\Users.csproj" />
       <ProjectReference Include="..\..\Modules\Orders\Orders.csproj" />
       <ProjectReference Include="..\..\Modules\Catalog\Catalog.csproj" />

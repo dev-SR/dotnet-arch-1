@@ -1,9 +1,9 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
-namespace MyApp.ApiHost.Persistence;
+namespace Shared.Application.Persistence;
 
-internal static class DbErrors
+public static class DbErrors
 {
     public static bool IsUniqueViolation(DbUpdateException ex) => ex.InnerException switch
     {

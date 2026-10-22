@@ -9,6 +9,7 @@ using MyApp.Modules.Users.Auth;
 using MyApp.Modules.Users.Auth.Authorization;
 using MyApp.Modules.Users.Persistence;
 using MyApp.Modules.Users.Persistence.Seeding;
+using Shared.Application.Persistence;
 
 namespace MyApp.Modules.Users;
 
@@ -24,7 +25,7 @@ public static class DependencyInjection
         var cs = configuration.GetConnectionString("Users")
                  ?? "Data Source=users.db";
 
-        services.AddDbContext<UsersDbContext>((sp, options) =>
+        services.AddTransactionalDbContext<UsersDbContext>((sp, options) =>
         {
             options.UseSqlite(cs);
             options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());

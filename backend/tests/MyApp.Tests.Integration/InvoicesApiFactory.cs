@@ -36,6 +36,9 @@ public sealed class InvoicesApiFactory : WebApplicationFactory<AssemblyMarker>, 
 
         builder.ConfigureServices(services =>
         {
+            foreach (var d in services.Where(x => x.ServiceType == typeof(DbContext)).ToList())
+                services.Remove(d);
+
             services.RemoveAll<DbContextOptions<InvoicesDbContext>>();
             services.RemoveAll<DbContextOptions>();
             services.RemoveAll<IDbContextOptionsConfiguration<InvoicesDbContext>>();
@@ -43,6 +46,7 @@ public sealed class InvoicesApiFactory : WebApplicationFactory<AssemblyMarker>, 
 
             services.AddDbContext<InvoicesDbContext>(options =>
                 options.UseSqlite(_connection));
+            services.AddScoped<DbContext>(sp => sp.GetRequiredService<InvoicesDbContext>());
         });
     }
 

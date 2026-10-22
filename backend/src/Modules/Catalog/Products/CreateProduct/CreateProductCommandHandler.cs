@@ -1,16 +1,19 @@
+using MyApp.Messaging.IntegrationEvents;
 using MyApp.Modules.Catalog.Brands;
 using MyApp.Modules.Catalog.Categories;
 using MyApp.Modules.Catalog.Persistence;
 using Shared.Common.Errors;
+using Wolverine.EntityFrameworkCore;
 
 namespace MyApp.Modules.Catalog.Products.CreateProduct;
 
 internal sealed class CreateProductCommandHandler(
     CatalogDbContext dbContext,
+    IDbContextOutbox outbox,
     ILogger<CreateProductCommandHandler> logger)
     : IRequestHandler<CreateProductCommand, ErrorOr<Guid>>
 {
-    public ValueTask<ErrorOr<Guid>> Handle(
+    public async ValueTask<ErrorOr<Guid>> Handle(
         CreateProductCommand command,
         CancellationToken cancellationToken)
     {
@@ -22,13 +25,18 @@ internal sealed class CreateProductCommandHandler(
             new Brand { Name = "Generic" });
 
         if (created.IsError)
-            return ValueTask.FromResult(ErrorOr<Guid>.From(created.Errors.ToList()));
+            return ErrorOr<Guid>.From(created.Errors.ToList());
 
         var product = created.Value;
+
+        // Same scoped DbContext TransactionBehavior will commit.
+        outbox.Enroll(dbContext);
         dbContext.Products.Add(product);
 
-        // SaveChanges is handled by TransactionBehavior (audit + domain events via interceptors)
-        logger.LogInformation("Product {ProductId} queued for create", product.Id);
-        return ValueTask.FromResult<ErrorOr<Guid>>(product.Id);
+        await outbox.PublishAsync(
+            new ProductCreatedIntegrationEvent(product.Id, product.Name, product.Price));
+
+        logger.LogInformation("Product {ProductId} queued for create + ProductCreatedIntegrationEvent", product.Id);
+        return product.Id;
     }
 }
