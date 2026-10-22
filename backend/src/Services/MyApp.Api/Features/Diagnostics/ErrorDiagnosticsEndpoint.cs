@@ -14,8 +14,8 @@ public sealed class ErrorDiagnosticsEndpoint : ICarterModule
             return;
 
         var group = app.MapGroup("/_diag")
-            .WithTags("Diagnostics")
-            .ExcludeFromDescription();
+            .WithTags("Diagnostics");
+            // .ExcludeFromDescription();
 
         group.MapGet("/result/{kind}", (string kind, HttpContext http) =>
         {
