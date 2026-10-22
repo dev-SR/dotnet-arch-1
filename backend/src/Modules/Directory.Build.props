@@ -1,0 +1,47 @@
+<Project>
+  <!--
+    Nested Directory.Build.props does not auto-import the parent — pull root TFM/analyzers first.
+    Baseline for every MyApp.Modules.* feature project (HTTP + Mediator + EF + Auth.Jwt).
+    Module csprojs keep only AssemblyName/RootNamespace plus rare extras (JwtBearer, Bogus, …).
+  -->
+  <Import Project="..\..\Directory.Build.props" />
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Carter" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\Mediator\Mediator.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\Application\Shared.Application.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\Common\Shared.Common.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Shared\MyApp.Modular\MyApp.Modular.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Carter" />
+    <Using Include="Mediator" />
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.AspNetCore.Routing" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="Shared.Application.Abstractions.Commands" />
+    <Using Include="Shared.Application.Abstractions.Queries" />
+    <Using Include="Shared.Application.Behaviors" />
+    <Using Include="Shared.Common.Errors" />
+    <Using Include="Shared.Common.Errors.Http" />
+  </ItemGroup>
+</Project>

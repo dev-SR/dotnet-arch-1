@@ -6,20 +6,29 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using MyApp.Persistence;
+using MyApp.ApiHost;
+using MyApp.Modules.Catalog.Persistence;
+using MyApp.Modules.Orders.Persistence;
+using MyApp.Modules.Users.Persistence;
 
 namespace MyApp.Tests.Integration;
 
-// AppDbContext (not Program) — test project also references InvoicesApi, which has its own Program.
-public class MyAppFactory : WebApplicationFactory<AppDbContext>
+/// <summary>
+/// Host factory for ApiHost. Uses <see cref="AssemblyMarker"/> because InvoicesApi also has a Program.
+/// </summary>
+public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
 {
-    private readonly SqliteConnection _connection = new("DataSource=:memory:");
+    private readonly SqliteConnection _users = new("DataSource=:memory:");
+    private readonly SqliteConnection _catalog = new("DataSource=:memory:");
+    private readonly SqliteConnection _orders = new("DataSource=:memory:");
     private readonly Dictionary<string, string?> _configOverrides;
 
     public MyAppFactory()
     {
         _configOverrides = new Dictionary<string, string?>();
-        _connection.Open();
+        _users.Open();
+        _catalog.Open();
+        _orders.Open();
     }
 
     public static MyAppFactory WithConfig(Dictionary<string, string?> overrides)
@@ -47,6 +56,9 @@ public class MyAppFactory : WebApplicationFactory<AppDbContext>
                 ["RateLimit:AuthPerMinute"] = "100",
                 ["Seed:AdminEmail"] = "",
                 ["Seed:AdminPassword"] = "",
+                ["ConnectionStrings:Users"] = "Data Source=:memory:",
+                ["ConnectionStrings:Catalog"] = "Data Source=:memory:",
+                ["ConnectionStrings:Orders"] = "Data Source=:memory:",
             };
             foreach (var (k, v) in _configOverrides)
                 defaults[k] = v;
@@ -55,20 +67,29 @@ public class MyAppFactory : WebApplicationFactory<AppDbContext>
 
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<DbContextOptions<AppDbContext>>();
-            services.RemoveAll<DbContextOptions>();
-            services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
-            services.RemoveAll<AppDbContext>();
-
-            services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlite(_connection));
+            ReplaceDbContext<UsersDbContext>(services, _users);
+            ReplaceDbContext<CatalogDbContext>(services, _catalog);
+            ReplaceDbContext<OrdersDbContext>(services, _orders);
         });
+    }
+
+    private static void ReplaceDbContext<TContext>(IServiceCollection services, SqliteConnection connection)
+        where TContext : DbContext
+    {
+        services.RemoveAll<DbContextOptions<TContext>>();
+        services.RemoveAll<IDbContextOptionsConfiguration<TContext>>();
+        services.RemoveAll<TContext>();
+        services.AddDbContext<TContext>(options => options.UseSqlite(connection));
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
-            _connection.Dispose();
+        {
+            _users.Dispose();
+            _catalog.Dispose();
+            _orders.Dispose();
+        }
         base.Dispose(disposing);
     }
 }

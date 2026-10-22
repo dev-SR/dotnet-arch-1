@@ -12,9 +12,9 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using MyApp.Features.Auth;
-using MyApp.Persistence;
-using MyApp.Persistence.Configurations;
+using MyApp.Modules.Users.Auth;
+using MyApp.Modules.Users.Persistence;
+using MyApp.Modules.Users.Persistence.Configurations;
 
 namespace MyApp.Tests.Integration;
 
@@ -42,7 +42,7 @@ public class ErrorChannelTests : IClassFixture<MyAppFactory>
     private void SeedAdminWithPermissions()
     {
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
         db.Database.EnsureCreated();
 
         if (!db.Roles.Any())
@@ -385,9 +385,9 @@ public class ErrorChannelTests : IClassFixture<MyAppFactory>
 }
 
 /// <summary>Same as <see cref="MyAppFactory"/> but Production — diag routes must not register.</summary>
-file sealed class ProductionMyAppFactory : WebApplicationFactory<AppDbContext>
+file sealed class ProductionMyAppFactory : WebApplicationFactory<MyApp.ApiHost.AssemblyMarker>
 {
-    private readonly string _dbName = $"myapp-prod-tests-{Guid.NewGuid()}";
+    private readonly string _suffix = Guid.NewGuid().ToString("N");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -409,13 +409,18 @@ file sealed class ProductionMyAppFactory : WebApplicationFactory<AppDbContext>
 
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<DbContextOptions<AppDbContext>>();
-            services.RemoveAll<DbContextOptions>();
-            services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
-            services.RemoveAll<AppDbContext>();
-
-            services.AddDbContext<AppDbContext>(options =>
-                options.UseInMemoryDatabase(_dbName));
+            ReplaceInMemory<UsersDbContext>(services, $"users-{_suffix}");
+            ReplaceInMemory<MyApp.Modules.Catalog.Persistence.CatalogDbContext>(services, $"catalog-{_suffix}");
+            ReplaceInMemory<MyApp.Modules.Orders.Persistence.OrdersDbContext>(services, $"orders-{_suffix}");
         });
+    }
+
+    private static void ReplaceInMemory<TContext>(IServiceCollection services, string name)
+        where TContext : DbContext
+    {
+        services.RemoveAll<DbContextOptions<TContext>>();
+        services.RemoveAll<IDbContextOptionsConfiguration<TContext>>();
+        services.RemoveAll<TContext>();
+        services.AddDbContext<TContext>(options => options.UseInMemoryDatabase(name));
     }
 }

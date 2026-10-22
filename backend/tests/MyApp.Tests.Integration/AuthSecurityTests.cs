@@ -7,9 +7,10 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using MyApp.Features.Auth;
-using MyApp.Persistence;
-using MyApp.Persistence.Configurations;
+using MyApp.Modules.Catalog.Persistence;
+using MyApp.Modules.Users.Auth;
+using MyApp.Modules.Users.Persistence;
+using MyApp.Modules.Users.Persistence.Configurations;
 
 namespace MyApp.Tests.Integration;
 
@@ -29,7 +30,7 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
     private void SeedRolesAndAdmin()
     {
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
         db.Database.EnsureCreated();
 
         if (!db.Roles.Any())
@@ -206,7 +207,7 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
 
         using (var scope = _factory.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
             var user = await db.Users.SingleAsync(u => u.NormalizedEmail == email.ToUpperInvariant());
             user.LockoutEnd.Should().NotBeNull();
             user.LockoutEnd!.Value.Should().BeAfter(DateTimeOffset.UtcNow);
@@ -340,7 +341,7 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
             ["RateLimit:GlobalPerMinute"] = "10000",
         });
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
         db.Database.EnsureCreated();
 
         var client = factory.CreateClient();
@@ -647,7 +648,7 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
     private async Task<Guid> FindUserIdAsync(string email)
     {
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
         return await db.Users
             .Where(u => u.NormalizedEmail == email.ToUpperInvariant())
             .Select(u => u.Id)
@@ -657,7 +658,7 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
     private async Task<int> CountProductsAsync()
     {
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
         return await db.Products.CountAsync();
     }
 

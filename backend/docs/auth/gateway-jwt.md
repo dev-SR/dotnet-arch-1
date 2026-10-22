@@ -10,7 +10,7 @@ Minimal multi-service auth demo that continues the monolith work on `auth`.
 | Project | URL | Role |
 | --- | --- | --- |
 | `MyApp.Gateway` | `http://localhost:5100` | YARP + **Scalar** (`/scalar`) federating OpenAPI |
-| `MyApp.Api` | `http://localhost:5101` | Token issuer + IAM + **products** (DB) + OpenAPI JSON |
+| `MyApp.ApiHost` | `http://localhost:5101` | Token issuer + IAM + **products** (DB) + OpenAPI JSON |
 | `MyApp.InvoicesApi` | `http://localhost:5102` | Invoice CRUD + ownership; claim-only `AddMyAppAuth` + Problem Details |
 | `MyApp.Auth.Jwt` | — | Shared HS256 + policies + `JwtBearerProblemDetails` + resource ownership |
 | `Shared.Common` | — | `Error` / `ToProblem` + `AddSharedExceptionHandling` (Auth + Invoices) |
@@ -34,7 +34,7 @@ Gateway does not validate JWT; forwards `Authorization`.
 
 ```bash
 # three terminals from MyApp/backend
-dotnet run --project src/Services/MyApp.Api
+dotnet run --project src/Services/MyApp.ApiHost
 dotnet run --project src/Services/MyApp.InvoicesApi
 dotnet run --project src/Services/MyApp.Gateway
 ```

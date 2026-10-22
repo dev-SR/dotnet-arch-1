@@ -1,0 +1,8 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MyApp.Modules.Orders</RootNamespace>
+    <AssemblyName>MyApp.Modules.Orders</AssemblyName>
+  </PropertyGroup>
+
+</Project>

@@ -6,9 +6,9 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using MyApp.Features.Auth;
-using MyApp.Persistence;
-using MyApp.Persistence.Configurations;
+using MyApp.Modules.Users.Auth;
+using MyApp.Modules.Users.Persistence;
+using MyApp.Modules.Users.Persistence.Configurations;
 
 namespace MyApp.Tests.Integration;
 
@@ -43,14 +43,14 @@ public class CrossServiceInvoiceTests : IClassFixture<MyAppFactory>, IClassFixtu
     private void SeedAuthAdmin()
     {
         using var scope = _authFactory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
         db.Database.EnsureCreated();
 
         if (!db.Roles.Any())
         {
             db.Roles.AddRange(
-                new Role { Id = RoleConfiguration.UserRoleId, Name = MyApp.Features.Auth.Roles.User, NormalizedName = "USER" },
-                new Role { Id = RoleConfiguration.AdminRoleId, Name = MyApp.Features.Auth.Roles.Admin, NormalizedName = "ADMIN" });
+                new Role { Id = RoleConfiguration.UserRoleId, Name = MyApp.Modules.Users.Auth.Roles.User, NormalizedName = "USER" },
+                new Role { Id = RoleConfiguration.AdminRoleId, Name = MyApp.Modules.Users.Auth.Roles.Admin, NormalizedName = "ADMIN" });
             db.SaveChanges();
         }
 
@@ -266,7 +266,7 @@ public class CrossServiceInvoiceTests : IClassFixture<MyAppFactory>, IClassFixtu
     private async Task<Guid> FindUserIdAsync(string email)
     {
         using var scope = _authFactory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
         return await db.Users
             .Where(u => u.NormalizedEmail == email.ToUpperInvariant())
             .Select(u => u.Id)
