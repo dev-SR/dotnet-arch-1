@@ -1,6 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using MyApp.Modules.Users.Persistence;
-
 namespace MyApp.Modules.Users.Auth.AdminUsers;
 
 public sealed class AdminPermissionsEndpoint : ICarterModule
@@ -40,19 +37,12 @@ public sealed class AdminPermissionsEndpoint : ICarterModule
 
     private static async Task<IResult> ListAsync(
         Guid roleId,
-        UsersDbContext db,
+        IMediator mediator,
+        HttpContext http,
         CancellationToken ct)
     {
-        if (!await db.Roles.AnyAsync(r => r.Id == roleId, ct))
-            return Results.NotFound();
-
-        var names = await db.RolePermissions
-            .Where(rp => rp.RoleId == roleId)
-            .Select(rp => rp.Permission.Name)
-            .OrderBy(n => n)
-            .ToListAsync(ct);
-
-        return Results.Ok(names);
+        var result = await mediator.Send(new ListRolePermissionsQuery(roleId), ct);
+        return result.MatchOk(http);
     }
 
     public sealed record AssignPermissionBody(string Permission);

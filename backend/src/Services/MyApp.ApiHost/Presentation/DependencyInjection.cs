@@ -76,7 +76,7 @@ public static class ApiServiceCollectionExtensions
                     {
                         Title = "MyApp API Host",
                         Version = "v1",
-                        Description = "Modular monolith composition root — Users, Catalog, Orders",
+                        Description = "Modular monolith composition root — Users, Catalog, Search",
                     };
                     document.AddAuthSecuritySchemes();
                     return Task.CompletedTask;

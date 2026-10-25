@@ -2,13 +2,15 @@
   <Folder Name="/src/" />
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/Catalog/Catalog.csproj" />
-    <Project Path="src/Modules/Orders/Orders.csproj" />
+    <Project Path="src/Modules/Search/Search.csproj" />
     <Project Path="src/Modules/Users/Users.csproj" />
   </Folder>
   <Folder Name="/src/Services/">
     <Project Path="src/Services/MyApp.ApiHost/MyApp.ApiHost.csproj" />
     <Project Path="src/Services/MyApp.Gateway/MyApp.Gateway.csproj" />
+    <Project Path="src/Services/MyApp.OrdersApi/MyApp.OrdersApi.csproj" />
     <Project Path="src/Services/MyApp.InvoicesApi/MyApp.InvoicesApi.csproj" />
+    <Project Path="src/Services/MyApp.ShippingApi/MyApp.ShippingApi.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/Mediator/Mediator.csproj" />

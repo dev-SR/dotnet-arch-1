@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -9,59 +8,74 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyApp.ApiHost;
 using MyApp.Modules.Catalog.Persistence;
-using MyApp.Modules.Orders.Persistence;
 using MyApp.Modules.Users.Persistence;
 
 namespace MyApp.Tests.Integration;
 
-/// <summary>
-/// Host factory for ApiHost. Uses <see cref="AssemblyMarker"/> because InvoicesApi also has a Program.
-/// File-based temp SQLite — Wolverine durability rejects in-memory databases.
-/// </summary>
 public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
 {
     private readonly string _usersPath;
     private readonly string _catalogPath;
-    private readonly string _ordersPath;
     private readonly string _usersCs;
     private readonly string _catalogCs;
-    private readonly string _ordersCs;
+    private readonly string _rabbitMq;
+    private readonly string _elasticsearchUri;
     private readonly Dictionary<string, string?> _configOverrides;
 
+    /// <summary>xUnit <c>IClassFixture</c> requires a single public constructor.</summary>
     public MyAppFactory()
+        : this("amqp://guest:guest@localhost:5672", "http://localhost:9200", null)
     {
+    }
+
+    private MyAppFactory(
+        string rabbitMqConnectionString,
+        string elasticsearchUri,
+        Dictionary<string, string?>? configOverrides)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rabbitMqConnectionString);
+        ArgumentException.ThrowIfNullOrWhiteSpace(elasticsearchUri);
         var id = Guid.NewGuid().ToString("N");
         _usersPath = Path.Combine(Path.GetTempPath(), $"myapp-users-{id}.db");
         _catalogPath = Path.Combine(Path.GetTempPath(), $"myapp-catalog-{id}.db");
-        _ordersPath = Path.Combine(Path.GetTempPath(), $"myapp-orders-{id}.db");
         _usersCs = $"Data Source={_usersPath}";
         _catalogCs = $"Data Source={_catalogPath}";
-        _ordersCs = $"Data Source={_ordersPath}";
+        _rabbitMq = rabbitMqConnectionString;
+        _elasticsearchUri = elasticsearchUri;
+        _configOverrides = configOverrides ?? new Dictionary<string, string?>();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Users", _usersCs);
         Environment.SetEnvironmentVariable("ConnectionStrings__Catalog", _catalogCs);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Orders", _ordersCs);
-
-        _configOverrides = new Dictionary<string, string?>();
+        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq);
+        Environment.SetEnvironmentVariable("Elasticsearch__Uri", _elasticsearchUri);
     }
 
     public string CatalogConnectionString => _catalogCs;
-    public string OrdersConnectionString => _ordersCs;
+    public string RabbitMqConnectionString => _rabbitMq;
+    public string ElasticsearchUri => _elasticsearchUri;
 
-    public static MyAppFactory WithConfig(Dictionary<string, string?> overrides)
-    {
-        var factory = new MyAppFactory();
-        foreach (var (k, v) in overrides)
-            factory._configOverrides[k] = v;
-        return factory;
-    }
+    public static MyAppFactory WithInfra(string rabbitMqConnectionString, string elasticsearchUri) =>
+        new(rabbitMqConnectionString, elasticsearchUri, null);
+
+    public static MyAppFactory WithRabbitMq(string rabbitMqConnectionString) =>
+        WithInfra(rabbitMqConnectionString, "http://localhost:9200");
+
+    public static MyAppFactory WithConfig(
+        Dictionary<string, string?> overrides,
+        string? rabbitMq = null,
+        string? elasticsearchUri = null) =>
+        new(
+            rabbitMq ?? "amqp://guest:guest@localhost:5672",
+            elasticsearchUri ?? "http://localhost:9200",
+            new Dictionary<string, string?>(overrides));
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Users", _usersCs);
         builder.UseSetting("ConnectionStrings:Catalog", _catalogCs);
-        builder.UseSetting("ConnectionStrings:Orders", _ordersCs);
+        builder.UseSetting("ConnectionStrings:RabbitMq", _rabbitMq);
+        builder.UseSetting("Elasticsearch:Uri", _elasticsearchUri);
 
         builder.ConfigureAppConfiguration((_, config) =>
         {
@@ -78,7 +92,8 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
                 ["Seed:AdminPassword"] = "",
                 ["ConnectionStrings:Users"] = _usersCs,
                 ["ConnectionStrings:Catalog"] = _catalogCs,
-                ["ConnectionStrings:Orders"] = _ordersCs,
+                ["ConnectionStrings:RabbitMq"] = _rabbitMq,
+                ["Elasticsearch:Uri"] = _elasticsearchUri,
             };
             foreach (var (k, v) in _configOverrides)
                 defaults[k] = v;
@@ -92,11 +107,9 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
 
             ReplaceDbContext<UsersDbContext>(services, _usersCs);
             ReplaceDbContext<CatalogDbContext>(services, _catalogCs);
-            ReplaceDbContext<OrdersDbContext>(services, _ordersCs);
 
             services.AddScoped<DbContext>(sp => sp.GetRequiredService<UsersDbContext>());
             services.AddScoped<DbContext>(sp => sp.GetRequiredService<CatalogDbContext>());
-            services.AddScoped<DbContext>(sp => sp.GetRequiredService<OrdersDbContext>());
         });
     }
 
@@ -119,7 +132,6 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
         {
             TryDelete(_usersPath);
             TryDelete(_catalogPath);
-            TryDelete(_ordersPath);
         }
         base.Dispose(disposing);
     }
@@ -133,7 +145,7 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
         }
         catch
         {
-            // best-effort cleanup
+            // best-effort
         }
     }
 }

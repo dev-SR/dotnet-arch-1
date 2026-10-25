@@ -1,6 +1,8 @@
 # Production-Ready JWT Auth for MyApp.Api (custom IAM)
 ### Instant ban/revoke · refresh rotation · rate limiting · `.env` + Options · Scalar Bearer
 
+Binding architecture (vertical slices, Shared kit, hosts): [`../ARCHITECTURE.md`](../ARCHITECTURE.md). This guide deepens JWT/IAM only — do not diverge from §4–§10 there.
+
 Most JWT tutorials stop at "sign a token, validate a token." Real APIs also need: *What happens when I ban a user right now? What if a refresh token leaks? What if someone hammers `/auth/login`?*
 
 This guide targets **[`MyApp.Api`](../../src/Services/MyApp.Api/)** and follows the **same feature pattern as Products**:

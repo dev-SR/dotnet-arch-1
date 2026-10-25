@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MyApp.Messaging;
+using MyApp.Messaging.IntegrationEvents;
 using MyApp.Modular;
 using MyApp.Modules.Catalog.Persistence;
+using Wolverine.Persistence.Durability;
 
 namespace MyApp.Modules.Catalog;
 
@@ -26,5 +30,17 @@ public static class CatalogModule
         }
 
         return app;
+    }
+
+    /// <summary>Publish product integration events from this module's store.</summary>
+    public static void ConfigureMessaging(
+        TransactionalMessagingOptions msg,
+        IConfiguration configuration)
+    {
+        msg.AddStore<CatalogDbContext>(
+            TransactionalMessagingOptions.RequireConnectionString(configuration, "Catalog"),
+            MessageStoreRole.Main);
+        msg.PublishToExchange<ProductCreatedIntegrationEvent>(MessagingQueues.ProductEventsExchange);
+        msg.PublishToExchange<ProductUpdatedIntegrationEvent>(MessagingQueues.ProductEventsExchange);
     }
 }

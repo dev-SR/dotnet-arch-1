@@ -2,31 +2,39 @@ using System.Text.Json;
 
 namespace MyApp.Gateway;
 
-/// <summary>Proxies upstream OpenAPI docs so Scalar can federate them on the gateway port.</summary>
 public static class OpenApiProxyEndpoints
 {
     public const string AuthClient = "auth-openapi";
+    public const string OrdersClient = "orders-openapi";
     public const string InvoicesClient = "invoices-openapi";
+    public const string ShippingClient = "shipping-openapi";
 
     public static IServiceCollection AddOpenApiProxyClients(
         this IServiceCollection services,
         IConfiguration configuration)
     {
         var authBase = configuration["OpenApi:AuthBaseUrl"] ?? "http://localhost:5101";
+        var ordersBase = configuration["OpenApi:OrdersBaseUrl"] ?? "http://localhost:5103";
         var invoicesBase = configuration["OpenApi:InvoicesBaseUrl"] ?? "http://localhost:5102";
+        var shippingBase = configuration["OpenApi:ShippingBaseUrl"] ?? "http://localhost:5104";
 
         services.AddHttpClient(AuthClient, c => c.BaseAddress = new Uri(authBase));
+        services.AddHttpClient(OrdersClient, c => c.BaseAddress = new Uri(ordersBase));
         services.AddHttpClient(InvoicesClient, c => c.BaseAddress = new Uri(invoicesBase));
+        services.AddHttpClient(ShippingClient, c => c.BaseAddress = new Uri(shippingBase));
         return services;
     }
 
     public static IEndpointRouteBuilder MapOpenApiProxyEndpoints(this IEndpointRouteBuilder app)
     {
-        // Root paths (preferred) + /scalar/... aliases for relative URL resolution from the UI.
         MapProxy(app, "/openapi/auth/v1.json", AuthClient);
         MapProxy(app, "/scalar/openapi/auth/v1.json", AuthClient);
+        MapProxy(app, "/openapi/orders/v1.json", OrdersClient);
+        MapProxy(app, "/scalar/openapi/orders/v1.json", OrdersClient);
         MapProxy(app, "/openapi/invoices/v1.json", InvoicesClient);
         MapProxy(app, "/scalar/openapi/invoices/v1.json", InvoicesClient);
+        MapProxy(app, "/openapi/shipping/v1.json", ShippingClient);
+        MapProxy(app, "/scalar/openapi/shipping/v1.json", ShippingClient);
         return app;
     }
 

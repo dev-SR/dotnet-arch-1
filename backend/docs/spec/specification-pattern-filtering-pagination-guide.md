@@ -4,6 +4,8 @@ date: '2026-09-27'
 excerpt: 'A hand-rolled Specification pattern with Include/ThenInclude support, wired into the Result-pattern pipeline, plus a richer entity model and seeder.'
 ---
 
+Binding architecture (vertical slices, Shared kit, hosts): [`../ARCHITECTURE.md`](../ARCHITECTURE.md). This guide deepens specs/pagination only — HTTP use-cases stay Carter + command/query slices (§4).
+
 > **Cross-checked against the actual MyApp layout.** Things below were adjusted from the original draft after checking against what's really in the repo today, not assumed:
 > 1. **No Domain project exists yet** — specs live in `Shared.Common.Specifications` (generic pieces) and per-feature folders under `MyApp.Api/Features/...` (concrete ones), not `Domain.Specifications`.
 > 2. **`Mediator` (`Shared.Mediator`), not `MediatR`** — handlers match `CreateProductCommandHandler` / `GetProductQueryHandler`: `IRequestHandler<TRequest, ErrorOr<TResponse>>` with `ValueTask<ErrorOr<TResponse>> Handle(...)`.

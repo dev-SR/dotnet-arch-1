@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Carter" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
   </ItemGroup>
@@ -17,6 +19,16 @@
     <ProjectReference Include="..\..\Shared\Application\Shared.Application.csproj" />
     <ProjectReference Include="..\..\Shared\Common\Shared.Common.csproj" />
     <ProjectReference Include="..\..\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
+    <ProjectReference Include="..\..\Shared\MyApp.Messaging\MyApp.Messaging.csproj" />
+    <ProjectReference Include="..\..\Shared\MyApp.Modular\MyApp.Modular.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Carter" />
+    <Using Include="Mediator" />
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.AspNetCore.Routing" />
   </ItemGroup>
 
 </Project>

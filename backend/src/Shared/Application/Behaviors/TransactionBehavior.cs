@@ -43,13 +43,14 @@ public sealed class TransactionBehavior<TRequest, TResponse>(
             var saved = new List<DbContext>();
             foreach (var db in contexts.Where(c => c.ChangeTracker.HasChanges()))
             {
-                // Wolverine IDbContextOutbox.Enroll may already open a transaction —
-                // never nest BeginTransaction; always Commit that ambient tx after SaveChanges
-                // or the whole unit of work (business + outbox rows) is rolled back on dispose.
+                // Wolverine IDbContextOutbox.Enroll (e.g. during SavingChanges) may open a
+                // transaction mid-SaveChanges — never nest BeginTransaction; always Commit
+                // after SaveChanges (same order as DbContextOutbox.SaveChangesAndFlushMessagesAsync)
+                // or the unit of work rolls back on dispose while the API already returned success.
                 if (db.Database.CurrentTransaction is not null)
                 {
                     await db.SaveChangesAsync(ct);
-                    await db.Database.CurrentTransaction.CommitAsync(ct);
+                    await CommitIfPresentAsync(db, ct);
                     saved.Add(db);
                     continue;
                 }
@@ -57,6 +58,7 @@ public sealed class TransactionBehavior<TRequest, TResponse>(
                 if (flushes.Length > 0 || !db.Database.IsRelational())
                 {
                     await db.SaveChangesAsync(ct);
+                    await CommitIfPresentAsync(db, ct);
                     saved.Add(db);
                     continue;
                 }
@@ -82,6 +84,12 @@ public sealed class TransactionBehavior<TRequest, TResponse>(
             return ErrorOrFactory.Failure<TResponse>(
                 [Error.Conflict("DB.CONFLICT", "The resource already exists or was changed by another request.")]);
         }
+    }
+
+    private static async Task CommitIfPresentAsync(DbContext db, CancellationToken ct)
+    {
+        if (db.Database.CurrentTransaction is not null)
+            await db.Database.CurrentTransaction.CommitAsync(ct);
     }
 
     private static async Task FlushAsync(

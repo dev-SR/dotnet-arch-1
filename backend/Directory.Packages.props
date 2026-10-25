@@ -38,7 +38,9 @@
     <PackageVersion Include="WolverineFx" Version="6.51.2" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.51.2" />
     <PackageVersion Include="WolverineFx.Sqlite" Version="6.51.2" />
+    <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.51.2" />
     <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.51.2" />
+    <PackageVersion Include="Elastic.Clients.Elasticsearch" Version="8.19.6" />
     <!-- Dynamic Linq for sorting -->
     <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.7.4" />
     <!-- Testing -->

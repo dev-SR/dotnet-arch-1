@@ -7,15 +7,16 @@ namespace MyApp.Modular;
 public static class ModularEfCoreExtensions
 {
     /// <summary>
-    /// Registers audit + domain-event save interceptors and <see cref="IUserContext"/>.
+    /// Registers the audit interceptor and <see cref="IUserContext"/>.
     /// Call once on the host; each module DbContext adds <c>sp.GetServices&lt;ISaveChangesInterceptor&gt;()</c>.
+    /// Domain-event dispatch moved to <c>TransactionalDomainEventInterceptor</c> (MyApp.Messaging),
+    /// registered by <c>UseTransactionalMessaging</c>.
     /// </summary>
     public static IServiceCollection AddModularEfCore(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
         services.AddScoped<IUserContext, HttpUserContext>();
         services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
-        services.AddScoped<ISaveChangesInterceptor, DispatchDomainEventsInterceptor>();
         return services;
     }
 }

@@ -1,26 +1,22 @@
 using System.Reflection;
 using JasperFx;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using MyApp.Messaging.Persistence;
 using Shared.Application.Persistence;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.Persistence.Durability;
+using Wolverine.RabbitMQ;
 using Wolverine.Sqlite;
 
 namespace MyApp.Messaging;
 
-/// <summary>
-/// Host-neutral Wolverine EF + SQLite outbox/inbox wiring for modular hosts and microservices.
-/// </summary>
 public static class TransactionalMessagingExtensions
 {
-    /// <summary>
-    /// Call once on the host. Registers Wolverine with durable local queues, EF transactions,
-    /// and message stores enrolled per module DbContext (ancillary stores for modular monoliths).
-    /// </summary>
     public static IHostApplicationBuilder UseTransactionalMessaging(
         this IHostApplicationBuilder builder,
         Action<TransactionalMessagingOptions> configure)
@@ -31,17 +27,21 @@ public static class TransactionalMessagingExtensions
         if (options.Stores.Count == 0)
             throw new InvalidOperationException("UseTransactionalMessaging requires at least one AddStore<TDbContext>().");
 
+        if (string.IsNullOrWhiteSpace(options.RabbitMqConnectionString))
+            throw new InvalidOperationException("UseTransactionalMessaging requires UseRabbitMq(connectionString).");
+
         builder.Services.AddScoped<IDbContextCommitFlush, WolverineDbContextCommitFlush>();
+        // Generic SavingChanges hook: enroll outbox + dispatch domain events via Mediator
+        // (in-process reactions + integration-event publisher handlers live in the modules).
+        builder.Services.AddScoped<ISaveChangesInterceptor, TransactionalDomainEventInterceptor>();
 
         builder.UseWolverine(opts =>
         {
-            // Single-node: own the durable local inbox immediately (dev + WebApplicationFactory).
             opts.Durability.Mode = DurabilityMode.Solo;
             opts.AutoBuildMessageStorageOnStartup = AutoCreate.CreateOrUpdate;
             opts.Policies.UseDurableLocalQueues();
             opts.UseEntityFrameworkCoreTransactions();
 
-            // Avoid picking up Mediator IRequestHandler.Handle methods as Wolverine handlers.
             opts.Discovery.DisableConventionalDiscovery();
             foreach (var assembly in options.HandlerAssemblies)
                 opts.Discovery.IncludeAssembly(assembly);
@@ -58,8 +58,35 @@ public static class TransactionalMessagingExtensions
                     .Enroll(store.DbContextType);
             }
 
-            // Local in-process delivery for integration events (broker comes later).
-            opts.PublishAllMessages().Locally();
+            var rabbit = opts.UseRabbitMq(options.RabbitMqConnectionString)
+                .AutoProvision();
+            if (options.AutoPurgeOnStartup)
+                rabbit.AutoPurgeOnStartup();
+
+            foreach (var binding in options.ExchangeBindings)
+                rabbit.BindExchange(binding.ExchangeName, ExchangeType.Fanout).ToQueue(binding.QueueName);
+
+            foreach (var pub in options.Publications)
+            {
+                if (pub.IsExchange)
+                {
+                    opts.PublishMessage(pub.MessageType)
+                        .ToRabbitExchange(pub.Destination)
+                        .UseDurableOutbox();
+                }
+                else
+                {
+                    opts.PublishMessage(pub.MessageType)
+                        .ToRabbitQueue(pub.Destination)
+                        .UseDurableOutbox();
+                }
+            }
+
+            foreach (var queue in options.ListenQueues.Distinct(StringComparer.Ordinal))
+            {
+                opts.ListenToRabbitQueue(queue)
+                    .UseDurableInbox();
+            }
         });
 
         return builder;
@@ -71,8 +98,20 @@ public sealed class TransactionalMessagingOptions
     internal List<MessagingStoreRegistration> Stores { get; } = [];
     internal List<Assembly> HandlerAssemblies { get; } = [];
     internal List<Type> HandlerTypes { get; } = [];
+    internal List<MessagePublication> Publications { get; } = [];
+    internal List<string> ListenQueues { get; } = [];
+    internal List<ExchangeBinding> ExchangeBindings { get; } = [];
+    internal string? RabbitMqConnectionString { get; private set; }
+    internal bool AutoPurgeOnStartup { get; private set; }
 
-    /// <summary>Enroll a module/service DbContext with its SQLite connection for outbox/inbox.</summary>
+    public TransactionalMessagingOptions UseRabbitMq(string connectionString, bool autoPurgeOnStartup = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        RabbitMqConnectionString = connectionString;
+        AutoPurgeOnStartup = autoPurgeOnStartup;
+        return this;
+    }
+
     public TransactionalMessagingOptions AddStore<TDbContext>(
         string connectionString,
         MessageStoreRole role = MessageStoreRole.Main)
@@ -83,7 +122,6 @@ public sealed class TransactionalMessagingOptions
         return this;
     }
 
-    /// <summary>Only scan these assemblies for Wolverine handlers (not Mediator handlers).</summary>
     public TransactionalMessagingOptions IncludeHandlersFrom(Assembly assembly)
     {
         HandlerAssemblies.Add(assembly);
@@ -97,13 +135,44 @@ public sealed class TransactionalMessagingOptions
         return this;
     }
 
-    /// <summary>Resolve connection string from configuration (throws if missing).</summary>
+    public TransactionalMessagingOptions PublishToQueue<TMessage>(string queueName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(queueName);
+        Publications.Add(new MessagePublication(typeof(TMessage), queueName, IsExchange: false));
+        return this;
+    }
+
+    public TransactionalMessagingOptions PublishToExchange<TMessage>(string exchangeName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(exchangeName);
+        Publications.Add(new MessagePublication(typeof(TMessage), exchangeName, IsExchange: true));
+        return this;
+    }
+
+    public TransactionalMessagingOptions ListenTo(string queueName, string? bindToFanoutExchange = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(queueName);
+        ListenQueues.Add(queueName);
+        if (!string.IsNullOrWhiteSpace(bindToFanoutExchange))
+            ExchangeBindings.Add(new ExchangeBinding(bindToFanoutExchange, queueName));
+        return this;
+    }
+
     public static string RequireConnectionString(IConfiguration configuration, string name) =>
         configuration.GetConnectionString(name)
         ?? throw new InvalidOperationException($"Connection string '{name}' is required for messaging.");
+
+    public static string RequireRabbitMq(IConfiguration configuration) =>
+        configuration.GetConnectionString("RabbitMq")
+        ?? configuration["Messaging:RabbitMq"]
+        ?? throw new InvalidOperationException("Connection string 'RabbitMq' (or Messaging:RabbitMq) is required.");
 }
 
 internal sealed record MessagingStoreRegistration(
     Type DbContextType,
     string ConnectionString,
     MessageStoreRole Role);
+
+internal sealed record MessagePublication(Type MessageType, string Destination, bool IsExchange);
+
+internal sealed record ExchangeBinding(string ExchangeName, string QueueName);

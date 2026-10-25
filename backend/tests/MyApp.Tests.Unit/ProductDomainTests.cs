@@ -2,6 +2,7 @@ using FluentAssertions;
 using MyApp.Modules.Catalog.Brands;
 using MyApp.Modules.Catalog.Categories;
 using MyApp.Modules.Catalog.Products;
+using MyApp.Modules.Catalog.Products.CreateProduct.Events;
 using Shared.Common.Errors;
 
 namespace MyApp.Tests.Unit;

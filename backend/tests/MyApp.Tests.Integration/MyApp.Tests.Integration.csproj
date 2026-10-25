@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -21,6 +21,7 @@
         <PackageReference Include="NSubstitute" />
         <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+        <PackageReference Include="Elastic.Clients.Elasticsearch" />
     </ItemGroup>
 
     <ItemGroup>
@@ -29,7 +30,9 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Services\MyApp.ApiHost\MyApp.ApiHost.csproj" />
+        <ProjectReference Include="..\..\src\Services\MyApp.OrdersApi\MyApp.OrdersApi.csproj" />
         <ProjectReference Include="..\..\src\Services\MyApp.InvoicesApi\MyApp.InvoicesApi.csproj" />
+        <ProjectReference Include="..\..\src\Services\MyApp.ShippingApi\MyApp.ShippingApi.csproj" />
         <ProjectReference Include="..\..\src\Shared\MyApp.Messaging\MyApp.Messaging.csproj" />
     </ItemGroup>
 </Project>

@@ -19,17 +19,10 @@ app.MapScalarApiReference("/scalar", options =>
         .EnablePersistentAuthentication()
         .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
 
-    // Separate OpenAPI docs — pick "Invoices" in the top-left document dropdown.
-    options.AddDocument(
-        "auth",
-        "Auth + Products",
-        routePattern: "/openapi/auth/v1.json",
-        isDefault: true);
-
-    options.AddDocument(
-        "invoices",
-        "Invoices",
-        routePattern: "/openapi/invoices/v1.json");
+    options.AddDocument("auth", "Auth + Products", routePattern: "/openapi/auth/v1.json", isDefault: true);
+    options.AddDocument("orders", "Orders + Cart", routePattern: "/openapi/orders/v1.json");
+    options.AddDocument("invoices", "Invoices", routePattern: "/openapi/invoices/v1.json");
+    options.AddDocument("shipping", "Shipping", routePattern: "/openapi/shipping/v1.json");
 });
 
 app.MapReverseProxy();

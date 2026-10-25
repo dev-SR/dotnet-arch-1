@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
@@ -10,16 +9,34 @@ using MyApp.InvoicesApi;
 
 namespace MyApp.Tests.Integration;
 
-/// <summary>WebApplicationFactory for the invoices microservice (shared JWT secret with AuthApi tests).</summary>
-public sealed class InvoicesApiFactory : WebApplicationFactory<AssemblyMarker>, IAsyncLifetime
+public sealed class InvoicesApiFactory : WebApplicationFactory<AssemblyMarker>
 {
-    private readonly SqliteConnection _connection = new("DataSource=:memory:");
+    private readonly string _dbPath;
+    private readonly string _cs;
+    private readonly string _rabbitMq;
 
-    public InvoicesApiFactory() => _connection.Open();
+    /// <summary>xUnit <c>IClassFixture</c> requires a single public constructor.</summary>
+    public InvoicesApiFactory()
+        : this("amqp://guest:guest@localhost:5672")
+    {
+    }
+
+    private InvoicesApiFactory(string rabbitMqConnectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rabbitMqConnectionString);
+        _dbPath = Path.Combine(Path.GetTempPath(), $"myapp-invoices-{Guid.NewGuid():N}.db");
+        _cs = $"Data Source={_dbPath}";
+        _rabbitMq = rabbitMqConnectionString;
+    }
+
+    public static InvoicesApiFactory WithRabbitMq(string rabbitMqConnectionString) =>
+        new(rabbitMqConnectionString);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("ConnectionStrings:Invoices", _cs);
+        builder.UseSetting("ConnectionStrings:RabbitMq", _rabbitMq);
 
         builder.ConfigureAppConfiguration((_, config) =>
         {
@@ -30,7 +47,8 @@ public sealed class InvoicesApiFactory : WebApplicationFactory<AssemblyMarker>, 
                 ["Jwt:Audience"] = "myapp-clients",
                 ["Jwt:AccessTokenMinutes"] = "10",
                 ["Jwt:RefreshTokenDays"] = "7",
-                ["ConnectionStrings:Invoices"] = "Data Source=:memory:",
+                ["ConnectionStrings:Invoices"] = _cs,
+                ["ConnectionStrings:RabbitMq"] = _rabbitMq,
             });
         });
 
@@ -40,26 +58,27 @@ public sealed class InvoicesApiFactory : WebApplicationFactory<AssemblyMarker>, 
                 services.Remove(d);
 
             services.RemoveAll<DbContextOptions<InvoicesDbContext>>();
-            services.RemoveAll<DbContextOptions>();
             services.RemoveAll<IDbContextOptionsConfiguration<InvoicesDbContext>>();
             services.RemoveAll<InvoicesDbContext>();
-
-            services.AddDbContext<InvoicesDbContext>(options =>
-                options.UseSqlite(_connection));
+            services.AddDbContext<InvoicesDbContext>(options => options.UseSqlite(_cs));
             services.AddScoped<DbContext>(sp => sp.GetRequiredService<InvoicesDbContext>());
         });
     }
 
-    public async Task InitializeAsync()
+    protected override void Dispose(bool disposing)
     {
-        using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<InvoicesDbContext>();
-        await db.Database.EnsureCreatedAsync();
-    }
-
-    async Task IAsyncLifetime.DisposeAsync()
-    {
-        await _connection.DisposeAsync();
-        Dispose();
+        if (disposing)
+        {
+            try
+            {
+                if (File.Exists(_dbPath))
+                    File.Delete(_dbPath);
+            }
+            catch
+            {
+                // best-effort
+            }
+        }
+        base.Dispose(disposing);
     }
 }

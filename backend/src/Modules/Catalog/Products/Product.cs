@@ -1,5 +1,7 @@
 using MyApp.Modules.Catalog.Brands;
 using MyApp.Modules.Catalog.Categories;
+using MyApp.Modules.Catalog.Products.CreateProduct.Events;
+using MyApp.Modules.Catalog.Products.UpdateProduct.Events;
 using MyApp.Modules.Catalog.Reviews;
 using MyApp.Modules.Catalog.Tags;
 using Shared.Common.Errors;
@@ -59,7 +61,7 @@ public sealed class Product : Aggregate
             IsActive = true,
             IsDeleted = false,
         };
-        product.AddDomainEvent(new ProductCreatedDomainEvent(product.Id, product.Name));
+        product.AddDomainEvent(new ProductCreatedDomainEvent(product.Id, product.Name, product.Price));
         return product;
     }
 
@@ -80,6 +82,7 @@ public sealed class Product : Aggregate
         Stock = stock;
         StockQuantity = stock;
         Category.Name = categoryName.Trim();
+        AddDomainEvent(new ProductUpdatedDomainEvent(Id, Name, Price));
         return default(Success);
     }
 

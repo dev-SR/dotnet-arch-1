@@ -1,5 +1,7 @@
 # Result Pattern, Error & Exception Handling
 
+Binding architecture (slices, hosts, Shared kit): [`../ARCHITECTURE.md`](../ARCHITECTURE.md). This guide deepens ErrorOr / HTTP mapping only — it must not invent alternate endpoint or messaging shapes.
+
 A **from-scratch learning guide** for the MyApp backend. Read in order. Each part builds on the last: first *why*, then *what you build*, then *how the live code does it*.
 
 | Part | File | You learn |

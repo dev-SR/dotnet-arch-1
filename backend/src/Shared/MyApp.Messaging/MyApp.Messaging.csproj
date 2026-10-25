@@ -17,11 +17,13 @@
     <PackageReference Include="WolverineFx" />
     <PackageReference Include="WolverineFx.EntityFrameworkCore" />
     <PackageReference Include="WolverineFx.Sqlite" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
     <PackageReference Include="WolverineFx.RuntimeCompilation" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Application\Shared.Application.csproj" />
+    <ProjectReference Include="..\Domain\Shared.Domain.csproj" />
   </ItemGroup>
 
 </Project>

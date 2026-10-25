@@ -404,14 +404,18 @@ file sealed class ProductionMyAppFactory : WebApplicationFactory<MyApp.ApiHost.A
                 ["RateLimit:AuthPerMinute"] = "100",
                 ["Seed:AdminEmail"] = "",
                 ["Seed:AdminPassword"] = "",
+                ["ConnectionStrings:RabbitMq"] = "amqp://guest:guest@localhost:5672",
+                ["Elasticsearch:Uri"] = "http://localhost:9200",
             });
         });
+
+        builder.UseSetting("ConnectionStrings:RabbitMq", "amqp://guest:guest@localhost:5672");
+        builder.UseSetting("Elasticsearch:Uri", "http://localhost:9200");
 
         builder.ConfigureServices(services =>
         {
             ReplaceInMemory<UsersDbContext>(services, $"users-{_suffix}");
             ReplaceInMemory<MyApp.Modules.Catalog.Persistence.CatalogDbContext>(services, $"catalog-{_suffix}");
-            ReplaceInMemory<MyApp.Modules.Orders.Persistence.OrdersDbContext>(services, $"orders-{_suffix}");
         });
     }
 
