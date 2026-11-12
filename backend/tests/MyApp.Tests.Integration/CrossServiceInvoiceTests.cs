@@ -10,6 +10,7 @@ using MyApp.InvoicesApi;
 using MyApp.Modules.Users.Auth;
 using MyApp.Modules.Users.Persistence;
 using MyApp.Modules.Users.Persistence.Configurations;
+using MyApp.Auth.Jwt;
 
 namespace MyApp.Tests.Integration;
 
@@ -50,8 +51,8 @@ public class CrossServiceInvoiceTests : IClassFixture<MyAppFactory>, IClassFixtu
         if (!db.Roles.Any())
         {
             db.Roles.AddRange(
-                new Role { Id = RoleConfiguration.UserRoleId, Name = MyApp.Modules.Users.Auth.Roles.User, NormalizedName = "USER" },
-                new Role { Id = RoleConfiguration.AdminRoleId, Name = MyApp.Modules.Users.Auth.Roles.Admin, NormalizedName = "ADMIN" });
+                new Role { Id = RoleConfiguration.UserRoleId, Name = MyApp.Auth.Jwt.Roles.User, NormalizedName = "USER" },
+                new Role { Id = RoleConfiguration.AdminRoleId, Name = MyApp.Auth.Jwt.Roles.Admin, NormalizedName = "ADMIN" });
             db.SaveChanges();
         }
 

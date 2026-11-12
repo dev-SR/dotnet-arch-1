@@ -11,9 +11,7 @@ public static class WebApplicationExtensions
         app.UseAuthorization();
 
         app.MapOpenApi().AllowAnonymous();
-        app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "invoices" }))
-            .AllowAnonymous()
-            .ExcludeFromDescription();
+        app.MapHealthChecks("/health").AllowAnonymous();
 
         return app;
     }

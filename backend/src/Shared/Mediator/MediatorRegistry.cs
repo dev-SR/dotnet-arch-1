@@ -1,5 +1,3 @@
-// Dispatcher/DispatcherRegistry.cs
-
 using System.Collections.Frozen;
 
 namespace Mediator;

@@ -1,6 +1,4 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace MyApp.Auth.Jwt;
 
@@ -23,6 +21,7 @@ public sealed class ResourcePermissionRequirement : IAuthorizationRequirement
 
 /// <summary>
 /// JWT permission claim + optional ownership (sub == OwnerId). Admin role bypasses ownership.
+/// The rule itself lives in <see cref="ResourceAccess"/>.
 /// </summary>
 public sealed class ResourcePermissionHandler
     : AuthorizationHandler<ResourcePermissionRequirement, IOwnedResource>
@@ -32,32 +31,9 @@ public sealed class ResourcePermissionHandler
         ResourcePermissionRequirement requirement,
         IOwnedResource resource)
     {
-        var hasPermission = context.User.HasClaim(c =>
-            c.Type == AuthClaimTypes.Permission &&
-            c.Value.Equals(requirement.Permission, StringComparison.OrdinalIgnoreCase));
-
-        if (!hasPermission)
-            return Task.CompletedTask;
-
-        if (!requirement.RequireOwnership)
-        {
+        var caller = Caller.From(context.User);
+        if (ResourceAccess.IsAllowed(caller, resource.OwnerId, requirement.Permission, requirement.RequireOwnership))
             context.Succeed(requirement);
-            return Task.CompletedTask;
-        }
-
-        if (context.User.IsInRole(Roles.Admin))
-        {
-            context.Succeed(requirement);
-            return Task.CompletedTask;
-        }
-
-        var sub = context.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        if (sub is not null
-            && Guid.TryParse(sub, out var userId)
-            && userId == resource.OwnerId)
-        {
-            context.Succeed(requirement);
-        }
 
         return Task.CompletedTask;
     }

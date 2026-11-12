@@ -1,3 +1,4 @@
+using MyApp.InvoicesApi.GetInvoice;
 using Shared.Application.Abstractions.Commands;
 
 namespace MyApp.InvoicesApi.CreateInvoice;
@@ -6,4 +7,4 @@ namespace MyApp.InvoicesApi.CreateInvoice;
 public sealed record CreateInvoiceCommand(
     string Number,
     decimal Amount,
-    Guid OwnerId) : ICommand<Invoice>;
+    Guid OwnerId) : ICommand<InvoiceDto>;

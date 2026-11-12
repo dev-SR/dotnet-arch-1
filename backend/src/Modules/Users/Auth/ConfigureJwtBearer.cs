@@ -58,7 +58,7 @@ public sealed class ConfigureJwtBearer : IConfigureNamedOptions<JwtBearerOptions
             return;
         }
 
-        var version = context.Principal!.FindFirstValue(AuthClaims.TokenVersion);
+        var version = context.Principal!.FindFirstValue(AuthClaimTypes.TokenVersion);
         if (version is null || !int.TryParse(version, out var tv) || tv != user.PermissionVersion)
         {
             context.HttpContext.Items[JwtBearerProblemDetails.ChallengeErrorItemKey] =

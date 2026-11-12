@@ -18,7 +18,4 @@ public static class WebApplicationExtensions
 
         return app;
     }
-
-    /// <summary>Backward-compatible alias.</summary>
-    public static WebApplication UsePresentation(this WebApplication app) => app.UseSharedPipeline();
 }

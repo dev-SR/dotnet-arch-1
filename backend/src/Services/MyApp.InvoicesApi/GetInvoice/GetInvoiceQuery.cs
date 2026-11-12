@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using MyApp.Auth.Jwt;
 using Shared.Application.Abstractions.Queries;
 
 namespace MyApp.InvoicesApi.GetInvoice;
@@ -10,4 +10,4 @@ public sealed record InvoiceDto(
     decimal Amount,
     DateTime CreatedAt);
 
-public sealed record GetInvoiceQuery(Guid Id, ClaimsPrincipal User) : IQuery<InvoiceDto>;
+public sealed record GetInvoiceQuery(Guid Id, Caller Caller) : IQuery<InvoiceDto>;

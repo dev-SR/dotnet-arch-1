@@ -1,16 +1,20 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 using MyApp.Modules.Catalog.Persistence;
 using MyApp.Modules.Users.Auth;
 using MyApp.Modules.Users.Persistence;
 using MyApp.Modules.Users.Persistence.Configurations;
+using MyApp.Auth.Jwt;
 
 namespace MyApp.Tests.Integration;
 
@@ -609,10 +613,7 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
         (await _client.GetAsync("/auth/demo/enhanced-security"))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        var mfaResp = await _client.PostAsync("/auth/demo/mfa-token", null);
-        mfaResp.EnsureSuccessStatusCode();
-        var mfa = await mfaResp.Content.ReadFromJsonAsync<TokenDto>(Json);
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mfa!.AccessToken);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", WithMfaClaim(token));
 
         using var req = new HttpRequestMessage(HttpMethod.Get, "/auth/demo/enhanced-security");
         req.Headers.TryAddWithoutValidation("X-Trusted-Client", "true");
@@ -620,6 +621,30 @@ public class AuthSecurityTests : IClassFixture<MyAppFactory>
     }
 
     // ── helpers ───────────────────────────────────────────────────────────
+
+    /// <summary>Test-only: adds amr=mfa to a real login token, signed with the secret the test host validates with.</summary>
+    private static string WithMfaClaim(string accessToken)
+    {
+        var source = new JsonWebToken(accessToken);
+        var claims = source.Claims
+            .Where(c => c.Type is not ("iat" or "nbf" or "exp" or "jti" or "amr" or "iss" or "aud"))
+            .Select(c => new Claim(c.Type, c.Value))
+            .Append(new Claim("amr", "mfa"))
+            .ToList();
+
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Issuer = source.Issuer,
+            Audience = source.Audiences.First(),
+            NotBefore = source.ValidFrom,
+            Expires = source.ValidTo,
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(MyAppFactory.JwtSecret)),
+                SecurityAlgorithms.HmacSha256),
+        };
+        return new JsonWebTokenHandler().CreateToken(descriptor);
+    }
 
     private async Task AsAdminAsync()
     {

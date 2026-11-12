@@ -1,6 +1,5 @@
-using System.Security.Claims;
+using MyApp.Auth.Jwt;
 using Shared.Application.Abstractions.Commands;
-using Shared.Common.Errors;
 
 namespace MyApp.InvoicesApi.UpdateInvoice;
 
@@ -8,4 +7,4 @@ public sealed record UpdateInvoiceCommand(
     Guid Id,
     string Number,
     decimal Amount,
-    ClaimsPrincipal User) : ICommand;
+    Caller Caller) : ICommand;

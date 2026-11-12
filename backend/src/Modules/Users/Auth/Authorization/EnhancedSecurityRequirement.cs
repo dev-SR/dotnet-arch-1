@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using MyApp.Auth.Jwt;
 
 namespace MyApp.Modules.Users.Auth.Authorization;
 
@@ -15,7 +16,7 @@ public sealed class EnhancedSecurityHandler : AuthorizationHandler<EnhancedSecur
         AuthorizationHandlerContext context,
         EnhancedSecurityRequirement requirement)
     {
-        var hasMfa = context.User.HasClaim(AuthClaims.Amr, "mfa");
+        var hasMfa = context.User.HasClaim(AuthClaimTypes.Amr, "mfa");
 
         var http = context.Resource as HttpContext;
         var trustedIp = false;

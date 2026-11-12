@@ -13,6 +13,7 @@ using MyApp.Modules.Users.Persistence.Configurations;
 using MyApp.OrdersApi.Persistence;
 using MyApp.OrdersApi.Consumers.ProjectProductCatalog;
 using MyApp.ShippingApi.Persistence;
+using MyApp.Auth.Jwt;
 
 namespace MyApp.Tests.Integration;
 

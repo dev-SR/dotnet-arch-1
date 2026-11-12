@@ -1,7 +1,6 @@
-using System.Security.Claims;
+using MyApp.Auth.Jwt;
 using Shared.Application.Abstractions.Commands;
-using Shared.Common.Errors;
 
 namespace MyApp.InvoicesApi.DeleteInvoice;
 
-public sealed record DeleteInvoiceCommand(Guid Id, ClaimsPrincipal User) : ICommand;
+public sealed record DeleteInvoiceCommand(Guid Id, Caller Caller) : ICommand;

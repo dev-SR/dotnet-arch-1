@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Mediator;
+using MyApp.Auth.Jwt;
 using Shared.Common.Errors.Http;
 
 namespace MyApp.InvoicesApi.UpdateInvoice;
@@ -25,7 +26,7 @@ public sealed class UpdateInvoiceEndpoint : ICarterModule
         CancellationToken ct)
     {
         var result = await mediator.Send(
-            new UpdateInvoiceCommand(id, body.Number, body.Amount, user),
+            new UpdateInvoiceCommand(id, body.Number, body.Amount, Caller.From(user)),
             ct);
         return result.MatchNoContent(http);
     }

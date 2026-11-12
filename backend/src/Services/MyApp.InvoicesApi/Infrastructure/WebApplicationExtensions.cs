@@ -1,3 +1,5 @@
+using MyApp.Modular;
+
 namespace MyApp.InvoicesApi.Infrastructure;
 
 public static class WebApplicationExtensions
@@ -6,7 +8,7 @@ public static class WebApplicationExtensions
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<InvoicesDbContext>();
-        db.Database.EnsureCreated();
+        DbContextSchema.Apply(db);
         return app;
     }
 }

@@ -36,5 +36,7 @@
         <ProjectReference Include="..\..\src\Shared\Application\Shared.Application.csproj" />
         <ProjectReference Include="..\..\src\Shared\MyApp.Messaging\MyApp.Messaging.csproj" />
         <ProjectReference Include="..\..\src\Modules\Catalog\Catalog.csproj" />
+        <ProjectReference Include="..\..\src\Services\MyApp.OrdersApi\MyApp.OrdersApi.csproj" />
+        <ProjectReference Include="..\..\src\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
     </ItemGroup>
 </Project>

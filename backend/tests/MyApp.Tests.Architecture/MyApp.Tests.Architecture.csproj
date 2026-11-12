@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <RootNamespace>MyApp.Tests.Architecture</RootNamespace>
+        <AssemblyName>MyApp.Tests.Architecture</AssemblyName>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio" />
+        <PackageReference Include="FluentAssertions" />
+        <PackageReference Include="NetArchTest.Rules" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Services\MyApp.ApiHost\MyApp.ApiHost.csproj" />
+        <ProjectReference Include="..\..\src\Services\MyApp.OrdersApi\MyApp.OrdersApi.csproj" />
+        <ProjectReference Include="..\..\src\Services\MyApp.InvoicesApi\MyApp.InvoicesApi.csproj" />
+        <ProjectReference Include="..\..\src\Services\MyApp.ShippingApi\MyApp.ShippingApi.csproj" />
+        <ProjectReference Include="..\..\src\Modules\Catalog\Catalog.csproj" />
+        <ProjectReference Include="..\..\src\Modules\Users\Users.csproj" />
+        <ProjectReference Include="..\..\src\Modules\Search\Search.csproj" />
+        <ProjectReference Include="..\..\src\Shared\Mediator\Mediator.csproj" />
+        <ProjectReference Include="..\..\src\Shared\Domain\Shared.Domain.csproj" />
+        <ProjectReference Include="..\..\src\Shared\Common\Shared.Common.csproj" />
+        <ProjectReference Include="..\..\src\Shared\Application\Shared.Application.csproj" />
+        <ProjectReference Include="..\..\src\Shared\MyApp.Modular\MyApp.Modular.csproj" />
+        <ProjectReference Include="..\..\src\Shared\MyApp.Auth.Jwt\MyApp.Auth.Jwt.csproj" />
+        <ProjectReference Include="..\..\src\Shared\MyApp.Messaging\MyApp.Messaging.csproj" />
+    </ItemGroup>
+</Project>

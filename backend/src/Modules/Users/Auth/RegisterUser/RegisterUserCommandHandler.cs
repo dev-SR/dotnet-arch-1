@@ -5,6 +5,7 @@ using MyApp.Modules.Users.Auth.Specifications;
 using MyApp.Modules.Users.Persistence;
 using Shared.Common.Errors;
 using Shared.Common.Specifications;
+using MyApp.Auth.Jwt;
 
 namespace MyApp.Modules.Users.Auth.RegisterUser;
 

@@ -1,14 +1,11 @@
 using Mediator;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using MyApp.Auth.Jwt;
 using Shared.Common.Errors;
 
 namespace MyApp.InvoicesApi.UpdateInvoice;
 
-internal sealed class UpdateInvoiceCommandHandler(
-    InvoicesDbContext db,
-    IAuthorizationService authz)
+internal sealed class UpdateInvoiceCommandHandler(InvoicesDbContext db)
     : IRequestHandler<UpdateInvoiceCommand, ErrorOr<Success>>
 {
     public async ValueTask<ErrorOr<Success>> Handle(
@@ -21,12 +18,7 @@ internal sealed class UpdateInvoiceCommandHandler(
         if (invoice is null)
             return Error.NotFound("INVOICE.NOT_FOUND", $"Invoice '{command.Id}' was not found.");
 
-        var check = await authz.AuthorizeAsync(
-            command.User,
-            invoice,
-            new ResourcePermissionRequirement(Permissions.Invoices.Edit));
-
-        if (!check.Succeeded)
+        if (!ResourceAccess.IsAllowed(command.Caller, invoice.OwnerId, Permissions.Invoices.Edit))
             return Error.Forbidden("INVOICE.FORBIDDEN", "You are not allowed to edit this invoice.");
 
         var number = command.Number.Trim();

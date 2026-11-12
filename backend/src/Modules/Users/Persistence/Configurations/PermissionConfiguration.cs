@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using MyApp.Modules.Users.Auth;
+using MyApp.Auth.Jwt;
 
 namespace MyApp.Modules.Users.Persistence.Configurations;
 

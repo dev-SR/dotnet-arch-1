@@ -1,12 +1,13 @@
 using Mediator;
+using MyApp.InvoicesApi.GetInvoice;
 using Shared.Common.Errors;
 
 namespace MyApp.InvoicesApi.CreateInvoice;
 
 internal sealed class CreateInvoiceCommandHandler(InvoicesDbContext db)
-    : IRequestHandler<CreateInvoiceCommand, ErrorOr<Invoice>>
+    : IRequestHandler<CreateInvoiceCommand, ErrorOr<InvoiceDto>>
 {
-    public ValueTask<ErrorOr<Invoice>> Handle(
+    public ValueTask<ErrorOr<InvoiceDto>> Handle(
         CreateInvoiceCommand command,
         CancellationToken cancellationToken)
     {
@@ -17,6 +18,11 @@ internal sealed class CreateInvoiceCommandHandler(InvoicesDbContext db)
             Amount = command.Amount,
         };
         db.Invoices.Add(invoice);
-        return ValueTask.FromResult<ErrorOr<Invoice>>(invoice);
+        return ValueTask.FromResult<ErrorOr<InvoiceDto>>(new InvoiceDto(
+            invoice.Id,
+            invoice.OwnerId,
+            invoice.Number,
+            invoice.Amount,
+            invoice.CreatedAt));
     }
 }

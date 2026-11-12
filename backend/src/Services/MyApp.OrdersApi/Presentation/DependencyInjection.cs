@@ -15,6 +15,7 @@ public static class ApiServiceCollectionExtensions
         var assembly = typeof(AssemblyMarker).Assembly;
 
         services.AddSharedExceptionHandling();
+        services.AddHealthChecks();
         services.AddMyAppAuth(configuration);
         services.AddAuthorization(options =>
         {

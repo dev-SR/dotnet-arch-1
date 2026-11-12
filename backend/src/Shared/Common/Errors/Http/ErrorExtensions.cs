@@ -27,13 +27,13 @@ public static class ErrorExtensions
 
         // TypedResults (not Results): the non-generic Results.Json(...) returns the
         // interface IResult with no compile-time guarantee of *what* it writes; TypedResults
-        // gives you a concrete result type, which is easier to unit-test (see section 9.3)
+        // gives you a concrete result type, which is easier to unit-test
         // and documents itself better in OpenAPI generation.
         return TypedResults.Json(problem, statusCode: status, contentType: ProblemJson);
     }
 
     // A LIST of errors → one ProblemDetails body. Needed because a single request can
-    // fail several validation rules at once (section 4), and the caller should see all
+    // fail several validation rules at once, and the caller should see all
     // of them in one round trip, not fix one field, resubmit, and hit the next.
     public static IResult ToProblem(this IReadOnlyList<Error> errors, HttpContext ctx, string? traceId = null)
     {

@@ -11,7 +11,7 @@ namespace MyApp.Auth.Jwt;
 public static class AuthServiceCollectionExtensions
 {
     /// <summary>
-    /// Hospital-style one-liner: HS256 JWT validation + claim-only permission policies.
+    /// HS256 JWT validation + claim-only permission policies.
     /// Does <b>not</b> register DB permission / token-version checkers — every host validates
     /// the shared secret and trusts embedded <c>permission</c> claims.
     /// </summary>
@@ -52,8 +52,8 @@ public static class AuthServiceCollectionExtensions
                     RoleClaimType = AuthClaimTypes.Role,
                 };
 
-                // Claim-only hosts (InvoicesApi): Problem Details on 401/403.
-                // AuthApi replaces Events via ConfigureJwtBearer but keeps these handlers.
+                // Claim-only hosts: Problem Details on 401/403. Hosts that need extra checks
+                // (e.g. the Users module's token-version/ban check) replace Events and re-attach these.
                 opts.Events = new JwtBearerEvents
                 {
                     OnChallenge = JwtBearerProblemDetails.OnChallengeAsync,

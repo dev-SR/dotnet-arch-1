@@ -1,3 +1,4 @@
+using MyApp.Modular;
 using MyApp.ShippingApi.Persistence;
 
 namespace MyApp.ShippingApi.Infrastructure;
@@ -8,7 +9,7 @@ public static class WebApplicationExtensions
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ShippingDbContext>();
-        db.Database.EnsureCreated();
+        DbContextSchema.Apply(db);
         return app;
     }
 }

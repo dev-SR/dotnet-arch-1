@@ -10,6 +10,7 @@ using MyApp.Modules.Users.Auth.Authorization;
 using MyApp.Modules.Users.Persistence;
 using MyApp.Modules.Users.Persistence.Seeding;
 using Shared.Application.Persistence;
+using MyApp.Auth.Jwt;
 
 namespace MyApp.Modules.Users;
 

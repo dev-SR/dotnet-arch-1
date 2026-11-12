@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyApp.Modules.Users.Auth;
 using MyApp.Modules.Users.Persistence;
 using MyApp.Modules.Users.Persistence.Configurations;
+using MyApp.Auth.Jwt;
 
 namespace MyApp.Tests.Integration;
 

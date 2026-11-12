@@ -36,10 +36,10 @@ public sealed class TokenService : ITokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now.UtcDateTime).ToString(), ClaimValueTypes.Integer64),
             new(JwtRegisteredClaimNames.Email, user.Email),
-            new(AuthClaims.TokenVersion, user.PermissionVersion.ToString()),
+            new(AuthClaimTypes.TokenVersion, user.PermissionVersion.ToString()),
         };
-        claims.AddRange(roles.Select(r => new Claim(AuthClaims.Role, r)));
-        claims.AddRange(permissions.Select(p => new Claim(AuthClaims.Permission, p)));
+        claims.AddRange(roles.Select(r => new Claim(AuthClaimTypes.Role, r)));
+        claims.AddRange(permissions.Select(p => new Claim(AuthClaimTypes.Permission, p)));
 
         var descriptor = new SecurityTokenDescriptor
         {

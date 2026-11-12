@@ -36,5 +36,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/MyApp.Tests.Integration/MyApp.Tests.Integration.csproj" />
     <Project Path="tests/MyApp.Tests.Unit/MyApp.Tests.Unit.csproj" />
+    <Project Path="tests/MyApp.Tests.Architecture/MyApp.Tests.Architecture.csproj" />
   </Folder>
 </Solution>

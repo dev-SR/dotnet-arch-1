@@ -15,7 +15,7 @@ internal sealed class Mediator(
             throw new InvalidOperationException(
                 $"No handler registered for request type '{request.GetType().FullName}'. " +
                 $"Ensure the handler implements IRequestHandler<{request.GetType().Name}, TResponse> " +
-                $"and that AddDispatcher scanned the correct assembly.");
+                $"and that RegisterRequestHandlers scanned the correct assembly.");
         }
         // Reference-type cast - cheap, no boxing
         return ((RequestHandlerBase<TResponse>)wrapper).Handle(request, provider, cancellationToken);

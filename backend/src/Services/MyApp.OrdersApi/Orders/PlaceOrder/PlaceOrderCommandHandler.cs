@@ -28,31 +28,22 @@ internal sealed class PlaceOrderCommandHandler(OrdersDbContext db)
         if (missing.Count > 0)
             return Error.Validation("CART.UNKNOWN_PRODUCT", "Cart contains products not in the local catalog.");
 
-        var order = new Order
-        {
-            CustomerId = command.CustomerId,
-            Status = OrderStatus.Placed,
-        };
-
-        foreach (var item in cart.Items)
-        {
-            var product = products[item.ProductId];
-            order.Items.Add(new OrderItem
+        var lines = cart.Items
+            .Select(item =>
             {
-                ProductId = item.ProductId,
-                ProductName = product.Name,
-                Quantity = item.Quantity,
-                UnitPriceAtPurchase = product.Price,
-            });
-        }
+                var product = products[item.ProductId];
+                return new OrderLine(item.ProductId, product.Name, item.Quantity, product.Price);
+            })
+            .ToList();
 
-        order.Total = order.Items.Sum(i => i.UnitPriceAtPurchase * i.Quantity);
-        order.ConfirmPlaced();
+        var placed = Order.Place(command.CustomerId, lines);
+        if (placed.IsError)
+            return placed.Errors.ToList();
 
-        db.Orders.Add(order);
+        db.Orders.Add(placed.Value);
         db.CartItems.RemoveRange(cart.Items);
         db.Carts.Remove(cart);
 
-        return order.Id;
+        return placed.Value.Id;
     }
 }

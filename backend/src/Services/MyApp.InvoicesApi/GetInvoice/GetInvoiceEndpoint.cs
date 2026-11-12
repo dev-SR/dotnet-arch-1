@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Mediator;
+using MyApp.Auth.Jwt;
 using Shared.Common.Errors.Http;
 
 namespace MyApp.InvoicesApi.GetInvoice;
@@ -21,7 +22,7 @@ public sealed class GetInvoiceEndpoint : ICarterModule
         HttpContext http,
         CancellationToken ct)
     {
-        var result = await mediator.Send(new GetInvoiceQuery(id, user), ct);
+        var result = await mediator.Send(new GetInvoiceQuery(id, Caller.From(user)), ct);
         return result.MatchOk(http);
     }
 }

@@ -14,6 +14,8 @@ namespace MyApp.Tests.Integration;
 
 public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
 {
+    public const string JwtSecret = "integration-test-secret-key-32chars!!";
+
     private readonly string _usersPath;
     private readonly string _catalogPath;
     private readonly string _usersCs;
@@ -81,7 +83,7 @@ public class MyAppFactory : WebApplicationFactory<AssemblyMarker>
         {
             var defaults = new Dictionary<string, string?>
             {
-                ["Jwt:Secret"] = "integration-test-secret-key-32chars!!",
+                ["Jwt:Secret"] = JwtSecret,
                 ["Jwt:Issuer"] = "myapp-api",
                 ["Jwt:Audience"] = "myapp-clients",
                 ["Jwt:AccessTokenMinutes"] = "10",

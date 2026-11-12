@@ -47,7 +47,7 @@ public readonly struct Error : IEquatable<Error>
         new(code, description, ErrorType.Unexpected, m);
 
     // Convenience for "this one field failed one rule" — code and field name are the same string,
-    // which is exactly what FluentValidation's PropertyName gives you (section 4).
+    // which is exactly what FluentValidation's PropertyName gives you.
     public static Error ValidationField(string propertyName, string message) =>
         Validation(propertyName, message);
 
