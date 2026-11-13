@@ -6,6 +6,8 @@
 >
 > **Open gaps:** TLS/mTLS, authentication on backends, HA, backup/restore, retention and cost math, multi-tenancy, and the SLO operating model are not yet designed. They are tracked in §28.
 >
+**How to read this guide:** §5–§6 explain the containers and collector topology; §7 explains what the .NET host emits; §8–§10 explain the signals; §13–§16 cover rules, alerts, SLOs, and dashboards; §18 is deployment. Each configuration section starts with the purpose and a key-setting table before the file.
+
 > **Architecture rules:** telemetry wiring is host-level and belongs in `Infrastructure/` (composition) and `Presentation/` (middleware). `Program.cs` may only add a single `Add*` call to the chain. Shared telemetry code lives in a host-only `Shared/MyApp.Observability` project, never in the shared kernel that modules reference.
 
 ---
@@ -175,6 +177,21 @@ Then in **every host csproj** (`MyApp.ApiHost.csproj`, `MyApp.OrdersApi.csproj`,
 ## 5. Infrastructure — `docker-compose.observability.yml`
 
 Drop this file next to the existing `docker-compose.yml`. Run the kit's existing compose for RabbitMQ + ES, then this one for the observability stack. (You can also merge them; keeping them split lets you start the stack only when you need it.)
+
+**What each container is for:**
+
+| Container | Job | Key port |
+| --- | --- | --- |
+| `otel-agent` | Receive OTLP from apps, enrich, batch, forward | `4317` / `4318` |
+| `otel-gateway` | Tail-sample, filter, fan out to backends | internal `4317`; `8889` self-metrics |
+| `prometheus` | Store metrics, evaluate rules | `9090` |
+| `loki` | Store logs | `3100` |
+| `tempo` | Store traces | `3200` |
+| `grafana` | Query and correlate | `3000` |
+| `alertmanager` | Route alerts | `9093` |
+
+The `app` network is external because the app containers (or host processes) already exist. The agent joins both networks so it can receive from apps and forward to the observability network.
+
 
 ```yaml
 # observability/docker-compose.observability.yml
@@ -351,6 +368,25 @@ If you're thinking "this is overkill for my team size" — for a single-node dep
 
 ### 6.1 Agent — `otel-collector/agent.yaml`
 
+**What the agent is for:** it runs close to the app (same host or Kubernetes node), receives OTLP, adds host/cluster information the app cannot know, batches, and forwards to the gateway. It is the first line of defence against a backend outage.
+
+**Key settings and why they matter:**
+
+| Setting | What it does | Why this value |
+| --- | --- | --- |
+| `memory_limiter` (processor) | Refuses data before the process runs out of memory | A crashed collector loses everything in flight |
+| `resourcedetection` | Adds `os.*`, `host.*`, `process.*` from the environment | The app should not hard-code host metadata |
+| `resource/enrich` | Adds environment, host, cloud provider/region | Makes every signal filterable by deployment context |
+| `filter/drop_healthchecks` | Drops `/health` and OpenAPI spans | Health checks are high-volume and low-value |
+| `batch` | Groups data before sending | Fewer network calls; lower overhead |
+| `sending_queue` (on the exporter) | Buffers when the gateway is down | Queueing belongs on the exporter, not as a processor |
+| `storage: file_storage` | Makes the queue survive collector restarts | Prevents data loss during a restart |
+| `retry_on_failure` | Retries with backoff | Turns a transient outage into delay, not loss |
+| `prometheus` exporter on `:8888` | Exposes the agent’s own metrics | Lets you alert on queue depth and dropped data |
+
+The important architectural point: the agent does **not** fan out to Tempo/Loki/Prometheus. It forwards to the gateway. That keeps app configuration simple and lets the gateway change without touching every host.
+
+
 The **agent** runs next to (or inside the same network as) each app. Its job: receive OTLP, **enrich** with resource attributes the app can't know (datacenter, cloud region, k8s node), **batch**, **retry** on queue full, and **forward** to the gateway over OTLP/gRPC.
 
 ```yaml
@@ -462,6 +498,25 @@ service:
 ```
 
 ### 6.2 Gateway — `otel-collector/gateway.yaml`
+
+**What the gateway is for:** it is the cluster chokepoint. It sees all spans for a trace, which is why tail sampling runs here. It also fans out to the three backends and does the heavy filtering.
+
+**Key settings and why they matter:**
+
+| Setting | What it does | Why this value |
+| --- | --- | --- |
+| `tail_sampling` | Decides after the trace completes | It can see status and duration, so it can keep errors and slow traces |
+| `decision_wait: 10s` | Waits for the trace to finish | Too short drops late spans; too long increases memory and latency |
+| `num_traces` | In-memory trace buffer | Must cover `expected_new_traces_per_sec × decision_wait` with headroom |
+| `policies` | Error, latency, then probabilistic baseline | The first matching policy wins; errors are kept before the 10% baseline |
+| `prometheusremotewrite` | Pushes metrics to Prometheus | Prometheus must run with `--web.enable-remote-write-receiver` |
+| `resource_to_telemetry_conversion` | Turns `service.name` into a label | Without it, all services collapse into one series |
+| `otlphttp/loki` | Sends logs to Loki over OTLP/HTTP | Loki’s OTLP HTTP endpoint is `:3100/otlp` |
+| `otlp/tempo` | Sends traces to Tempo | Tempo’s OTLP/gRPC receiver is `:4317` |
+| `prometheus` on `:8889` | Exposes gateway self-metrics | Needed to alert on queue depth and dropped data |
+
+**Tail sampling in one sentence:** the gateway holds a trace for `decision_wait`, then asks “is it an error, is it slow, or should I keep a 10% sample?” and keeps it if any policy says yes. That is how you keep 100% of errors without storing 100% of traffic.
+
 
 The **gateway** is the cluster chokepoint. It does the **heavy filtering**, **routing**, and **fan-out** to the three backends. Apps never talk to it directly in prod — the agent always sits between them.
 
@@ -615,7 +670,31 @@ service:
 
 ### 7.1 Host-only shared project — `MyApp.Observability`
 
+**Why this section exists:** the host is the only place that knows the process identity (`service.name`) and the export endpoint. Modules should not know about collectors or exporters. Keeping the wiring in one host-only project makes that boundary explicit and avoids five slightly different copies.
+
+
 This is the **single** entry point for telemetry in every host. Put it in a host-only `src/Shared/MyApp.Observability` project (not in `MyApp.Modular`, which every module references), and call it once from each `Program.cs` in the `Add*` chain. Middleware belongs in `Presentation/`, not in `Program.cs`.
+
+**What each instrumentation call does:**
+
+| Call | What it produces | Why it is configured this way |
+| --- | --- | --- |
+| `ConfigureResource` | `service.name`, version, environment, host | Identity for every signal; set once, never change after deploy |
+| `AddSource("Wolverine")` | Producer/consumer spans | Wolverine’s instrumentation is built in and opt-in by source |
+| `AddSource("MyApp.Catalog")` etc. | Your custom spans | Exact names; a listener that does not match returns `null` activities |
+| `AddAspNetCoreInstrumentation` | Server spans + HTTP metrics | Root span for every request |
+| `Filter` on health/OpenAPI | Drops noisy requests | Keeps the trace list and metrics focused on real traffic |
+| `AddHttpClientInstrumentation` | Outbound client spans | Shows downstream calls inside the request trace |
+| `AddEntityFrameworkCoreInstrumentation` | DB spans | Shows query time under the handler |
+| `AddOtlpExporter` (traces) | OTLP batch export | Batching avoids one network call per span |
+| `AddMeter("Wolverine*")` | Wolverine metrics | The meter name is `Wolverine:{AppName}`, so wildcard is required |
+| `AddMeter("MyApp.Catalog")` etc. | Custom metrics | Exact names only; no wildcard dependency |
+| `ExportIntervalMilliseconds = 15000` | Metrics export cadence | Matches Prometheus’s scrape interval |
+| `AddLogging(...AddOpenTelemetry...)` | OTLP log records | Logs carry `trace_id`/`span_id` for correlation |
+
+**Why no `SetSampler` here:** dev traffic is low, so the default `ParentBased(AlwaysOn)` keeps every trace. Add a sampler only when you have a volume or cost reason, and read §7.5c first.
+
+**Why no manual propagator:** the default is W3C TraceContext + Baggage. In 1.17 the static setter is not available through the DI builder; use `OTEL_PROPAGATORS` only for a non-default propagator.
 
 ```csharp
 // src/Shared/MyApp.Observability/ObservabilityServiceCollectionExtensions.cs
