@@ -933,3 +933,24 @@ Use these as examples for the patterns above. Paths are relative to `backend/`.
 | Unit tests for pipeline and mapping | `tests/MyApp.Tests.Unit/` |
 
 When unsure, copy the **CreateProduct** slice shape, not an inline handler in `Program.cs`.
+---
+
+## 21. Observability (cross-cutting)
+
+OpenTelemetry is optional infrastructure, but when it is present it follows the same layering rules as everything else.
+
+| Rule | Detail |
+| --- | --- |
+| Host-only project | Telemetry wiring lives in `src/Shared/YourApp.Observability` (or each host's `Infrastructure/`). It is referenced by hosts only. Never add OpenTelemetry packages to `YourApp.Modular` or `Shared.Application`, because every module references those. |
+| Composition | Each host's `Program.cs` adds one `AddYourAppObservability(configuration, serviceName)` call in the existing `Add*` chain. Nothing else. |
+| Middleware | Cross-cutting middleware (for example baggage) is registered inside `Presentation/UseSharedPipeline()`, never in `Program.cs`. |
+| Service identity | One `service.name` per process (`yourapp.apihost`, `yourapp.ordersapi`, …). It is set once in the resource and must not change after deployment. |
+| Traces | Register `AddSource("Wolverine")` plus the exact custom source names. Wolverine propagates `traceparent` and creates consumer spans in the same trace. |
+| Metrics | Register `AddMeter("Wolverine*")` (the meter name includes the application) and the exact custom meter names. Do not rely on wildcards for custom meters or sources. |
+| Logs | `ILogger` is the only logging API. No PII, tokens, passwords, or SQL text in logs, span attributes, or metric labels. |
+| SQL | `SetDbStatementForText = false`. Query text never leaves the process. |
+| Correlation | Logs carry `trace_id`/`span_id`; traces carry `service.name`; metrics carry the sanitized `service_name` label (`service.name` becomes `service_name` in Prometheus). |
+| Failure semantics | Telemetry export failures must never fail a request. Exporters batch and drop; the application does not block on them. |
+| Tests | `tests/YourApp.Tests.Architecture` must still pass: telemetry code may not introduce root-level endpoints, `Results.*` in domain endpoints, or `Program.cs` pipeline code. |
+
+Production concerns — TLS, sampling, retention, cardinality limits, SLOs, and cost — are design work, not wiring. They must be decided and tested before a deployment is called production-ready.
