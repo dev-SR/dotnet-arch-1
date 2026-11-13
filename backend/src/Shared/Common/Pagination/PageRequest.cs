@@ -9,6 +9,9 @@ public class PageRequest
     public int? PageSize { get; init; }
 
     public string? OrderBy { get; init; }
-    public bool Desc { get; init; }
+
+    /// <summary>Optional query param — null means ascending. A non-nullable bool is treated as required by minimal APIs.</summary>
+    public bool? Desc { get; init; }
+
     public string? Search { get; init; }
 }

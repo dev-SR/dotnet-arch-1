@@ -26,7 +26,7 @@ public static class PagedQueryExtensions
 
         IReadOnlyList<T> items = Array.Empty<T>();
         if (skip < total)   // page number beyond the last page → empty, skip the second query entirely
-            items = await ApplyOrder(source, request.OrderBy, request.Desc).Skip(skip).Take(size).ToListAsync(ct);
+            items = await ApplyOrder(source, request.OrderBy, request.Desc ?? false).Skip(skip).Take(size).ToListAsync(ct);
 
         return new PagedResult<T>(items, total, page, size);
     }

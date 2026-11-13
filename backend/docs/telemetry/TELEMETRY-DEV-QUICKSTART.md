@@ -1151,6 +1151,8 @@ If you want error codes on the span, add `IReadOnlyList<Error> Errors` to `IErro
 | `PUT /cart/items` | A command in OrdersApi with its own trace |
 | `POST /orders` | OrdersApi → RabbitMQ → InvoicesApi and ShippingApi, with the order counter and active-order gauge |
 
+**Catalog list parameters:** `page`, `pageSize`, `orderBy` (`Name`, `Price`, `StockQuantity`, `CreatedAt`), `desc` (`true`/`false`), `search`, `minPrice`, `maxPrice`, `inStockOnly`, `categoryId`, `brandId`, `tagId`.
+
 **How to read the trace tree:** the top line is the incoming HTTP request. Indented lines are work done because of it. A Wolverine `send` is followed by `receive` spans in the consumer processes. All of them share one `trace_id`.
 
 
@@ -1169,9 +1171,11 @@ PRODUCT_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
   -d '{"Name":"Telemetry Test","Category":"Books","Price":12.99,"Stock":5}' \
   | tr -d '"')
 
-# 3. Read a product to generate a GET span
+# 3. Read products to generate a GET span.
+#    Paging/sorting params are optional; the example shows them explicitly.
+#    desc: true = descending, false = ascending.
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:5101/products?pageSize=5" > /dev/null
+  "http://localhost:5101/products?page=1&pageSize=5&desc=false" > /dev/null
 
 # 4. Place an order -> OrdersApi + InvoicesApi + ShippingApi in one trace
 curl -s -H "Authorization: Bearer $TOKEN" \

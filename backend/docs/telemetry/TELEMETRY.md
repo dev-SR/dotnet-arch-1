@@ -2223,7 +2223,7 @@ TOKEN=$(curl -s -X POST http://localhost:5101/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"Email":"admin@example.com","Password":"ChangeMe-12345"}' \
   | jq -r .access_token)
-curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5101/products?pageSize=5
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:5101/products?page=1&pageSize=5&desc=false"
 curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:5101/products \
   -H 'Content-Type: application/json' \
   -d '{"Name":"Telemetry Test Product","Category":"Books","Price":19.99,"Stock":10}'
