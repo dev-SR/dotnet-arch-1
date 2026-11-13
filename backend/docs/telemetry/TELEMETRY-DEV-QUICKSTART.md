@@ -74,6 +74,25 @@ Gateway :5100 ──► ApiHost :5101 ──► RabbitMQ ──► Search (in-pr
 
 ---
 
+## 0.1 Where to look (URLs and which ones have a UI)
+
+**Grafana is the UI for traces and logs.** Tempo and Loki are storage/query backends; their ports serve APIs, not dashboards.
+
+| What | URL | UI? | Use it for |
+| --- | --- | --- | --- |
+| Grafana | http://localhost:3000 | Yes | Traces, logs, metrics, correlation (login `admin` / `admin`) |
+| Tempo | http://localhost:3200 | No, API | Trace search/read API; open traces in Grafana |
+| Loki | http://localhost:3100 | No, API | Log query API; open logs in Grafana |
+| Prometheus | http://localhost:9090 | Basic | PromQL queries and target status |
+| Alertmanager | http://localhost:9093 | Yes | Alerts and silences |
+| Collector metrics | http://localhost:8889/metrics | No, text | Raw collector/self metrics |
+| RabbitMQ | http://localhost:15672 | Yes | Queues, consumers, message rates (`guest` / `guest`) |
+| Elasticsearch | http://localhost:9200 | No, API | Search index health |
+
+The short version: **open Grafana, choose the datasource, then Explore.** You do not “open Tempo” in a browser; you open Grafana and use its Tempo datasource.
+
+---
+
 ## 1. Bring up the backends
 
 Create `observability-dev/` next to `backend/`. Six files, six containers.
@@ -1188,14 +1207,34 @@ curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:5103/orders
 sleep 3
 ```
 
-To find the trace id, query Tempo — do not expect a `traceparent` response header:
+To find the trace id, query Tempo’s API — do not expect a `traceparent` response header:
 
 ```bash
 curl -s "http://localhost:3200/api/search?tags=service.name%3Dmyapp.apihost&limit=1" \
   | jq -r '.traces[0].traceID'
 ```
 
-Open that trace in Tempo. For `POST /products` you should see:
+### 8.1 Open the trace in Grafana (Tempo is not a UI)
+
+1. Open **http://localhost:3000** and log in with `admin` / `admin`.
+2. In the left sidebar, click **Explore** (the compass icon).
+3. At the top, open the datasource dropdown and choose **Tempo**.
+4. Set **Query type** to **Search**.
+5. Enter:
+   - **Service Name:** `myapp.apihost`
+   - **Span Name:** `POST /products`
+6. Click **Run query**.
+7. Click the trace row that appears. The waterfall view opens.
+
+If you already have the trace id, use **Query type → TraceQL** and run:
+
+```traceql
+{ trace:id = "PASTE_TRACE_ID_HERE" }
+```
+
+Tempo’s own port (`http://localhost:3200/api/traces/<trace-id>`) returns JSON for scripts, not a visual trace. Use Grafana for the visual view.
+
+For `POST /products` you should see:
 
 ```
 POST /products                  myapp.apihost
@@ -1216,20 +1255,32 @@ For the order, you should see `myapp.ordersapi`, `myapp.invoicesapi`, and `myapp
 
 ## 9. Verify each component
 
-Each check proves one link in the chain. Work from the app outward:
+Each check proves one link in the chain. Work from the app outward.
 
-| Check | What it proves |
-| --- | --- |
-| Collector `/metrics` | The apps reached the collector and it accepted OTLP |
-| Prometheus `up` | Prometheus can scrape the collector |
-| Prometheus `http_server_request_duration_seconds_count` | Metrics were converted and labelled correctly |
-| Loki `{service_name="..."}` | Logs arrived and `service.name` became a stream label |
-| Tempo `/api/search` | Spans arrived and are queryable |
-| Grafana `/api/health` | The UI is up and datasources are provisioned |
-| Alertmanager `/-/healthy` | The alerting component is up |
+### 9.1 UI checks
+
+| Component | Where to click | What you should see |
+| --- | --- | --- |
+| Grafana | http://localhost:3000 → log in | Dashboards/Explore load |
+| Data sources | **Connections → Data sources** → open each → **Test** | Prometheus, Loki, Tempo, Alertmanager report success |
+| Prometheus | **Explore** → datasource **Prometheus** → query `up` → **Run query** | One series with value `1` for the collector |
+| Prometheus app metrics | Same datasource → `http_server_request_duration_seconds_count` | Series per `service_name` and `http_route` |
+| Loki | **Explore** → datasource **Loki** → `{service_name="myapp.apihost"}` → **Run query** | Log lines; expand one to see fields |
+| Tempo | **Explore** → datasource **Tempo** → **Search** → Service Name `myapp.apihost` → **Run query** | Trace rows; click one for the waterfall |
+| Alertmanager | http://localhost:9093 | Alertmanager UI loads; no firing alerts |
+| RabbitMQ | http://localhost:15672 (`guest` / `guest`) → **Queues** | `orders.product-events`, `invoices.order-events`, `shipping.order-events` with consumers |
+| Collector | http://localhost:8889/metrics | Text metrics page with `otelcol_*` series |
+
+**UI navigation for the main flow:**
+
+1. **Grafana → Explore → Tempo → Search → `myapp.apihost` → Run query → click trace.**
+2. In the trace, click the `CreateProduct` span. The right panel shows its attributes and events.
+3. Click **Logs for this trace** (Tempo → Loki). You should see the logs emitted during that trace.
+4. Go back to **Explore → Loki**, run `{service_name="myapp.apihost"}`, expand a log line, and click **View trace**.
+
+### 9.2 API checks
 
 Prometheus sanitizes label names: `service.name` becomes `service_name`, `http.route` becomes `http_route`. Use the underscore form in PromQL, not the OTel form.
-
 
 ```bash
 # Collector is receiving OTLP
@@ -1291,13 +1342,21 @@ myapp_orders_active{status="placed"}
 The links only work if the datasource `uid`s and the `trace_id` field are configured correctly. That is why §1.6 uses stable `uid`s and `matcherType: label`.
 
 
-Open http://localhost:3000 (`admin` / `admin`).
+**Step-by-step:**
 
-1. **Metrics:** Explore → Prometheus → run the queries above.
-2. **Logs:** Explore → Loki → `{service_name="myapp.apihost"}` → Logs view.
-3. **Traces:** Explore → Tempo → search `service.name = myapp.apihost`.
-4. **Trace → logs:** open a trace, then “Logs for this trace”. This works because the OTel logs SDK attaches `trace_id`.
-5. **Log → trace:** expand a log line and click “View trace”. This uses the `trace_id` structured field configured in §1.6.
+1. Open **http://localhost:3000** and log in (`admin` / `admin`).
+2. Click **Explore** in the left sidebar.
+3. Choose **Tempo** in the datasource dropdown.
+4. Set **Query type** to **Search**, enter Service Name `myapp.apihost`, and click **Run query**.
+5. Click a `POST /products` trace. The waterfall shows:
+   - `POST /products` (HTTP server span)
+   - `CreateProduct` (custom span)
+   - `savechanges` (EF Core)
+   - `send ProductCreated` (Wolverine producer)
+   - `receive ProductCreated` in `myapp.ordersapi`
+6. Click a span to see its attributes on the right.
+7. Click **Logs for this trace** to jump to Loki with the trace id applied.
+8. Switch the datasource to **Loki**, run `{service_name="myapp.apihost"}`, expand a log line, and click **View trace** to return to Tempo.
 
 If the log→trace link does not appear, check that Loki received `trace_id` as structured metadata:
 

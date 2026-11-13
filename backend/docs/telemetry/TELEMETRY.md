@@ -284,7 +284,7 @@ services:
       - ./tempo/overrides.yml:/etc/tempo/overrides.yml:ro
       - tempo-data:/var/tempo
     ports:
-      - "3200:3200"   # Tempo HTTP UI / TraceQL
+      - "3200:3200"   # Tempo HTTP API / TraceQL (UI is Grafana)
       - "14268:14268" # Jaeger ingest (legacy)
     networks: [obs]
     restart: unless-stopped
