@@ -44,6 +44,11 @@ internal sealed class PlaceOrderCommandHandler(OrdersDbContext db)
         db.CartItems.RemoveRange(cart.Items);
         db.Carts.Remove(cart);
 
+        OrderTelemetry.OrdersCreated.Add(1,
+            new KeyValuePair<string, object?>("status", "placed"));
+        OrderTelemetry.ActiveOrders.Add(1,
+            new KeyValuePair<string, object?>("status", "placed"));
+
         return placed.Value.Id;
     }
 }

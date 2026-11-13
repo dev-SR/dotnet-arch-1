@@ -1,4 +1,5 @@
 using Shared.Common.Exceptions.Http;
+using MyApp.Observability;
 
 namespace MyApp.InvoicesApi.Presentation;
 
@@ -9,6 +10,7 @@ public static class WebApplicationExtensions
         app.UseSharedExceptionHandling();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseMiddleware<BaggageMiddleware>();
 
         app.MapOpenApi().AllowAnonymous();
         app.MapHealthChecks("/health").AllowAnonymous();

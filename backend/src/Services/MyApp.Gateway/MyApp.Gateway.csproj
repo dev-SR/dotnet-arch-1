@@ -12,4 +12,8 @@
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\MyApp.Observability\MyApp.Observability.csproj" />
+  </ItemGroup>
+
 </Project>

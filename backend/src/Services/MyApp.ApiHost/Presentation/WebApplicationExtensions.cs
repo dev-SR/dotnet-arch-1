@@ -1,4 +1,5 @@
 using Shared.Common.Exceptions.Http;
+using MyApp.Observability;
 
 namespace MyApp.Presentation;
 
@@ -12,6 +13,7 @@ public static class WebApplicationExtensions
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseMiddleware<BaggageMiddleware>();
 
         app.MapHealthChecks("/health").AllowAnonymous();
         app.MapOpenApi().AllowAnonymous();

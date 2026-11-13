@@ -14,6 +14,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
         services.AddPipelineBehavior(typeof(ValidationBehavior<,>));
         services.AddPipelineBehavior(typeof(TransactionBehavior<,>));
+        services.AddPipelineBehavior(typeof(ErrorTracingBehavior<,>));
 
         return services;
     }

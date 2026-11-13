@@ -1,12 +1,15 @@
 using MyApp.Gateway;
 using Scalar.AspNetCore;
+using MyApp.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
-builder.Services.AddOpenApiProxyClients(builder.Configuration);
+builder.Services
+    .AddMyAppObservability(builder.Configuration, "myapp.gateway")
+    .AddOpenApiProxyClients(builder.Configuration);
 
 var app = builder.Build();
 

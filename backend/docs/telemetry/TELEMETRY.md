@@ -647,11 +647,8 @@ public static class ObservabilityServiceCollectionExtensions
         // ── Context propagator — W3C TraceContext + Baggage (see §7.5a)
         // Enables baggage to flow through Wolverine/RabbitMQ and HttpClient so
         // user.id / tenant.id set in the JWT middleware arrive at every consumer.
-        Propagators.DefaultTextMapPropagator = new CompositeTextMapPropagator(new TextMapPropagator[]
-        {
-            new TraceContextPropagator(),
-            new BaggagePropagator(),
-        });
+        // The default propagator is W3C TraceContext + Baggage.
+        // Override with OTEL_PROPAGATORS if needed.
 
         var otel = services.AddOpenTelemetry();
 
@@ -705,16 +702,10 @@ public static class ObservabilityServiceCollectionExtensions
                     msg.RequestUri is null
                     || !msg.RequestUri.AbsolutePath.StartsWith("/health", StringComparison.OrdinalIgnoreCase);
             })
-            .AddEntityFrameworkCoreInstrumentation(o =>
-            {
-                o.SetDbStatementForText = false;        // don't leak query text in prod
-                o.SetDbStatementForStoredProcedure = false;
-                o.EnrichWithIDbCommand = (activity, cmd) =>
-                {
-                    activity?.SetTag("db.connection_string", "redacted");
-                    activity?.SetTag("myapp.db.command_type", cmd.CommandType.ToString());
-                };
-            })
+            .AddEntityFrameworkCoreInstrumentation()
+            // The 1.13-beta package does not expose SetDbStatementForText or the
+            // stored-procedure switch. Verify the emitted db.* attributes before
+            // treating this as PII-safe in production.
             .AddProcessor(new PiiRedactionProcessor())  // §7.5b — redact emails + JWTs from spans
             .AddOtlpExporter(o =>
             {
@@ -2330,7 +2321,7 @@ Prometheus stays local (or use Mimir / Thanos for HA).
 - [ ] Tempo query endpoint behind Grafana's auth proxy (don't expose :3200)
 - [ ] Alertmanager webhook receivers use HTTPS + shared secret
 - [ ] PII: never put user IDs in trace attributes; use `myapp.tenant.id` instead. The `MyEnvironmentLogEnricher` only adds non-PII.
-- [ ] `SetDbStatementForText = false` (already set) — query text never leaves the host.
+- [ ] EF Core instrumentation attributes verified: the 1.13-beta package does not expose `SetDbStatementForText`, so confirm what `db.*` attributes are emitted.
 
 ---
 
@@ -3422,7 +3413,7 @@ Add to your `service-overview.json` dashboard (§15.4):
 | Prometheus has 100k+ series for `http.server.request.duration` | `http.target` (raw URL) leaking as a label | Enable `filter/cardinality` on gateway (§6.2) |
 | No Wolverine spans | `"Wolverine"` source not registered | Add `.AddSource("Wolverine")` (§10) |
 | No Wolverine metrics | Meter registered without a wildcard | Use `.AddMeter("Wolverine*")` (§10) |
-| EF Core span shows `db.statement = "SELECT ..."` | `SetDbStatementForText` not set to false | Set it to false (§7.1) — already done |
+| EF Core span shows `db.statement = "SELECT ..."` | EF instrumentation emits old attributes | The 1.13-beta package does not expose `SetDbStatementForText`; filter the attribute in the collector or pin a package that does |
 | Dashboards empty after first deploy | Service variable uses `service_name` (underscore) but data has `service.name` (dot) | OTel → Prometheus converts `.` to `_` in labels; both queries use `service_name` consistently |
 | Collector logs `sending queue full` | `queue_size` too small for traffic | Bump `queue_size` in `agent.yaml` and HPA the gateway |
 | Grafana "Trace not found" when clicking a log link | Tempo retention < Loki retention | Match retention windows or use Loki search-to-trace fallback |

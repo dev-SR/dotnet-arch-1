@@ -30,6 +30,9 @@
   <Folder Name="/src/Shared/MyApp.Messaging/">
     <Project Path="src/Shared/MyApp.Messaging/MyApp.Messaging.csproj" />
   </Folder>
+  <Folder Name="/src/Shared/MyApp.Observability/">
+    <Project Path="src/Shared/MyApp.Observability/MyApp.Observability.csproj" />
+  </Folder>
   <Folder Name="/src/Shared/MyApp.Modular/">
     <Project Path="src/Shared/MyApp.Modular/MyApp.Modular.csproj" />
   </Folder>

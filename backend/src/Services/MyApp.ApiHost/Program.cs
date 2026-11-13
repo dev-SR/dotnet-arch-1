@@ -7,6 +7,7 @@ using MyApp.Modules.Catalog;
 using MyApp.Modules.Search;
 using MyApp.Modules.Users;
 using MyApp.Presentation;
+using MyApp.Observability;
 
 Env.TraversePath().Load();
 
@@ -15,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration)
+    .AddMyAppObservability(builder.Configuration, "myapp.apihost")
     .AddModularEfCore()
     .AddApi(builder.Configuration)
     .AddUsersModule(builder.Configuration)

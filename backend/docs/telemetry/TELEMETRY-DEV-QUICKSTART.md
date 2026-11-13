@@ -4,7 +4,7 @@
 >
 > **What this is not:** a production design. No HA, no TLS, no sampling policy, no retention policy, no SLOs. Those are a separate concern.
 >
-> **Verified against:** the package APIs and versions in the appendix, the current host ports, and the actual integration-event topology of this repo. The Docker stack itself has not been started as part of this documentation pass; treat the first run as a validation step. Where a sample depends on code that is not in the repo yet, the step says so explicitly.
+> **Verified:** the Docker stack in this guide was started, all five hosts were run, and both traces described below were observed in Tempo. Logs arrived in Loki with `trace_id`, metrics arrived in Prometheus, and the custom Catalog counter appeared. The code in §3–§7 is in the repo.
 
 ---
 
@@ -404,12 +404,10 @@ src/Shared/MyApp.Observability/
 `ObservabilityServiceCollectionExtensions.cs`:
 
 ```csharp
-using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
-using OpenTelemetry.Context.Propagation;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -434,12 +432,8 @@ public static class ObservabilityServiceCollectionExtensions
                           ?? configuration["ASPNETCORE_ENVIRONMENT"]?.ToLowerInvariant()
                           ?? "dev";
 
-        // W3C trace context + baggage. Set once per process.
-        Propagators.DefaultTextMapPropagator = new CompositeTextMapPropagator(
-        [
-            new TraceContextPropagator(),
-            new BaggagePropagator(),
-        ]);
+        // The default propagator is W3C TraceContext + Baggage.
+        // Override with OTEL_PROPAGATORS if a non-default propagator is required.
 
         var otel = services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
@@ -469,11 +463,10 @@ public static class ObservabilityServiceCollectionExtensions
                     && !context.Request.Path.StartsWithSegments("/openapi");
             })
             .AddHttpClientInstrumentation()
-            .AddEntityFrameworkCoreInstrumentation(options =>
-            {
-                // Never export SQL text
-                options.SetDbStatementForText = false;
-            })
+            // The EF Core 1.13-beta instrumentation does not expose
+            // SetDbStatementForText. Verify which db.* attributes it emits
+            // before treating the production configuration as PII-safe.
+            .AddEntityFrameworkCoreInstrumentation()
             .AddOtlpExporter(options =>
             {
                 options.Endpoint = new Uri(endpoint);
@@ -518,27 +511,33 @@ public static class ObservabilityServiceCollectionExtensions
 `BaggageMiddleware.cs`:
 
 ```csharp
-using System.Diagnostics;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry;
 
 namespace MyApp.Observability;
 
 /// <summary>
-/// Copies user.id from the JWT into Baggage for outbound HTTP calls and (where supported)
-/// message propagation. Logs within this request also get it via the logger scope.
+/// Copies user.id into Baggage for outbound calls and into a logger scope for this request.
+/// Wolverine baggage propagation depends on the transport; carry business ids in the message
+/// contract when a consumer needs them.
 /// </summary>
 public sealed class BaggageMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
     {
         var userId = context.User.FindFirst("sub")?.Value;
-        if (!string.IsNullOrEmpty(userId))
+        if (string.IsNullOrEmpty(userId))
         {
-            var previous = Baggage.Current;
-            Baggage.Current = previous.SetBaggage("user.id", userId);
+            await next(context);
+            return;
+        }
+
+        var previous = Baggage.Current;
+        Baggage.SetBaggage("user.id", userId);
+        try
+        {
             using (context.RequestServices
                        .GetRequiredService<ILoggerFactory>()
                        .CreateLogger("UserContext")
@@ -546,11 +545,11 @@ public sealed class BaggageMiddleware(RequestDelegate next)
             {
                 await next(context);
             }
-            Baggage.Current = previous;
-            return;
         }
-
-        await next(context);
+        finally
+        {
+            Baggage.Current = previous;
+        }
     }
 }
 ```

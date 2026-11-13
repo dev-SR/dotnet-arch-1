@@ -595,7 +595,9 @@ var composite = new CompositeTextMapPropagator(new TextMapPropagator[]
     new LegacyCorrelationPropagator(),
     new BaggagePropagator(),
 });
-Propagators.DefaultTextMapPropagator = composite;
+// Propagators.DefaultTextMapPropagator is read-only in OpenTelemetry 1.17.
+// To use a custom propagator, build the provider through Sdk.CreateTracerProviderBuilder()
+// or set OTEL_PROPAGATORS for a built-in one.
 ```
 
 Now every HttpClient call and Wolverine message carries both `traceparent` (W3C) and `X-Correlation-Id` (legacy). Legacy consumers that only read the latter still get a correlation ID.
