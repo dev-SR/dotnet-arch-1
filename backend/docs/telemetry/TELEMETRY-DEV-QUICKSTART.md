@@ -898,6 +898,7 @@ curl -s -G "http://localhost:3100/loki/api/v1/query_range" \
 | `traceparent` header not in curl response | ASP.NET Core does not emit it | Read the trace id from Tempo, not from the response. |
 | Consumer trace missing | The consumer service is not running | Start OrdersApi/InvoicesApi/ShippingApi; check `/health`. |
 | `ErrorOr` failures are green | Handler span is not the HTTP span | Expected. The behavior marks the handler span red; the HTTP status is unchanged. |
+| Integration tests time out on messaging | Manually started hosts hold the RabbitMQ queue consumers | Stop the `dotnet run` hosts before `dotnet test tests/YourApp.Tests.Integration`. |
 
 ---
 
