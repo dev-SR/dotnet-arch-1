@@ -14,7 +14,7 @@
 
 Commands show the directory they expect. The short version: compose files are under `MyApp/`; `dotnet run` commands are under `MyApp/backend/`.
 
-> **Verified:** the Docker stack in this guide was started, ApiHost + OrdersApi + InvoicesApi + ShippingApi were run, and both traces described below were observed in Tempo. Logs arrived in Loki with `trace_id`, metrics arrived in Prometheus, and the custom Catalog counter appeared. The Gateway wiring is included; its proxy spans are not part of the verified flow because it only forwards. The code in §3–§7 is in the repo.
+> **Verified:** the one-command `docker-compose.dev.yml` stack was built and started. All five hosts returned `/health` 200; `POST /products` produced a trace spanning ApiHost and OrdersApi; placing an order produced a trace spanning OrdersApi, InvoicesApi, and ShippingApi. Logs arrived in Loki with `trace_id`, metrics arrived in Prometheus, the custom Catalog and Orders counters appeared, and the Gateway proxied `/products` to ApiHost. The code in §3–§7 is in the repo.
 
 ---
 
@@ -81,6 +81,8 @@ Create `observability-dev/` next to `backend/`. Six files, six containers.
 ### 1.1 `docker-compose.yml`
 
 **What this file does:** it starts six containers and connects them on one Docker network. Think of it as the “machine room”: the collector is the door telemetry comes in through, and Prometheus/Loki/Tempo are the three storage rooms behind it. Grafana is the window you look through.
+
+The same config files are reused by the root `docker-compose.dev.yml` (§1.8). Use the root file for the one-command full stack; use this file only when you want the observability containers without the .NET hosts.
 
 **Key settings and why they matter:**
 
@@ -478,24 +480,95 @@ receivers:
   - name: dev-null
 ```
 
-### 1.8 Start the backends
+### 1.8 Start the stack
 
-From the `MyApp/` folder:
+Everything — RabbitMQ, Elasticsearch, the observability stack, and the five .NET hosts — is defined in one file at the repo root: `docker-compose.dev.yml`.
 
-```bash
-# 1. RabbitMQ + Elasticsearch (the app's own dependencies)
-docker compose -f backend/docker-compose.yml up -d
-
-# 2. The observability stack
-docker compose -f observability-dev/docker-compose.yml up -d
-docker compose -f observability-dev/docker-compose.yml ps
-```
-
-All six observability containers should be running, and RabbitMQ/Elasticsearch should become healthy. If the collector restarts, run:
+From `MyApp/`:
 
 ```bash
-docker compose -f observability-dev/docker-compose.yml logs otel-collector --tail 30
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml ps
 ```
+
+The first build takes a few minutes because each host is published from `backend/Dockerfile`. Later runs reuse the image layers.
+
+If Docker Desktop runs out of memory while building five images at once, limit the build parallelism:
+
+```bash
+COMPOSE_PARALLEL_LIMIT=2 docker compose -f docker-compose.dev.yml up -d --build
+```
+
+**If you are adding the telemetry code yourself,** finish §2–§7 first. The compose file builds the current source; running it before the code exists will start the infrastructure but the hosts will fail to build.
+
+**If you want only the infrastructure while developing locally** (the `dotnet run` path in §4.1), start just those services:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d rabbitmq elasticsearch \
+  otel-collector prometheus loki tempo grafana alertmanager
+```
+
+Check the collector if something looks wrong:
+
+```bash
+docker compose -f docker-compose.dev.yml logs otel-collector --tail 30
+```
+
+**What this one file gives you:**
+
+| Service | Host port | Why it is in the same compose file |
+| --- | --- | --- |
+| `rabbitmq` | 5672 / 15672 | Messaging between ApiHost and the services |
+| `elasticsearch` | 9200 | Search module index |
+| `otel-collector` | 4317 / 4318 / 8889 | Single OTLP entry point |
+| `prometheus` | 9090 | Metrics storage |
+| `loki` | 3100 | Logs storage |
+| `tempo` | 3200 | Traces storage |
+| `grafana` | 3000 | Dashboards and correlation |
+| `alertmanager` | 9093 | Alert routing |
+| `myapp-apihost` | 5101 | Modular monolith |
+| `myapp-ordersapi` | 5103 | Orders service |
+| `myapp-invoicesapi` | 5102 | Invoices service |
+| `myapp-shippingapi` | 5104 | Shipping service |
+| `myapp-gateway` | 5100 | YARP proxy + Scalar |
+
+Inside the compose network, every host listens on `8080`. The host ports above are only for your browser and `curl`.
+
+### 1.9 `docker-compose.dev.yml` — the one-command full stack
+
+The files above define the observability containers. The repo root also has `docker-compose.dev.yml`, which adds **RabbitMQ, Elasticsearch, and the five .NET hosts** to the same stack.
+
+**What this file does:** it turns “five terminals plus two compose files” into one command. Compose builds each host from `backend/Dockerfile`, puts every container on one network, and passes the container-specific connection strings as environment variables.
+
+**Key settings and why they matter:**
+
+| Setting | What it does | Why this value |
+| --- | --- | --- |
+| `build.context: ./backend` | Build context for the hosts | The Dockerfile needs `Directory.Build.props`, `Directory.Packages.props`, and `src/` |
+| `build.args.PROJECT` | Which `.csproj` to publish | One Dockerfile builds any host |
+| `build.args.ASSEMBLY` | Which DLL to run | The runtime image starts that assembly |
+| `ports: "5101:8080"` | Host port → container port | All hosts listen on `8080` inside the network; the host ports stay the same as `dotnet run` |
+| `ConnectionStrings__RabbitMq: amqp://...@rabbitmq:5672` | Broker address | Inside compose, `localhost` means the container itself, not RabbitMQ |
+| `Elasticsearch__Uri: http://elasticsearch:9200` | Search index address | Same reason |
+| `OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317` | Telemetry destination | Container DNS name, not `localhost` |
+| `Data Source=/data/*.db` + named volumes | SQLite files | The database survives `docker compose down`; `-v` deletes it |
+| `OpenApi__*BaseUrl` and `ReverseProxy__*Address` | Gateway → backend URLs | The gateway runs in a container, so it cannot use `localhost:5101` |
+| `depends_on` with `condition: service_healthy` | Start ordering | ApiHost waits for RabbitMQ and Elasticsearch before it migrates/seeds |
+| `restart: unless-stopped` | Crash recovery | A failed host restarts; check `logs` if it loops |
+
+**The Dockerfile in one paragraph:** it is a standard multi-stage build. The `sdk` stage restores and publishes the selected project; the `aspnet` runtime stage copies the published output and runs the DLL on port `8080`. The `PROJECT` and `ASSEMBLY` build arguments are what let one file build all five hosts.
+
+**Port map:**
+
+| Host | Host URL | Container name |
+| --- | --- | --- |
+| Gateway | `http://localhost:5100` | `myapp-gateway` |
+| ApiHost | `http://localhost:5101` | `myapp-apihost` |
+| InvoicesApi | `http://localhost:5102` | `myapp-invoicesapi` |
+| OrdersApi | `http://localhost:5103` | `myapp-ordersapi` |
+| ShippingApi | `http://localhost:5104` | `myapp-shippingapi` |
+
+**Why not just use `dotnet run`?** Use `dotnet run` when you need a debugger or `dotnet watch`. Use compose when you want the full distributed flow (RabbitMQ, search, all consumers, gateway) without managing five terminals. Stop the compose host services before running a host locally (§4.2).
 
 ---
 
@@ -810,39 +883,74 @@ public static WebApplication UseSharedPipeline(this WebApplication app)
 
 ---
 
-### 4.1 Run the hosts (in this order)
+### 4.1 Run all hosts with the same compose
 
-Do this **before** generating traffic. The order matters because ApiHost owns the database schema, seed data, and the integration-event wiring that the extracted services consume.
-
-From `MyApp/backend/`, open five terminals:
+The five hosts are services in `docker-compose.dev.yml`, built from `backend/Dockerfile`. One command starts them all:
 
 ```bash
-# Terminal 1 - ApiHost first (schema + seed + exchanges/queues)
-dotnet run --project src/Services/MyApp.ApiHost --urls http://localhost:5101
-
-# Terminal 2 - OrdersApi (consumer of product events)
-dotnet run --project src/Services/MyApp.OrdersApi --urls http://localhost:5103
-
-# Terminal 3 - InvoicesApi (consumer of order events)
-dotnet run --project src/Services/MyApp.InvoicesApi --urls http://localhost:5102
-
-# Terminal 4 - ShippingApi (consumer of order events)
-dotnet run --project src/Services/MyApp.ShippingApi --urls http://localhost:5104
-
-# Terminal 5 - Gateway last (optional, proxy + Scalar)
-dotnet run --project src/Services/MyApp.Gateway --urls http://localhost:5100
+# From MyApp/
+docker compose -f docker-compose.dev.yml up -d --build \
+  myapp-apihost myapp-ordersapi myapp-invoicesapi myapp-shippingapi myapp-gateway
 ```
 
-**Why this order:**
+Or start the whole stack (infrastructure + observability + hosts):
 
-| Step | Why it is here |
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+**Service names and ports:**
+
+| Compose service | `service.name` | Host port | Internal port |
+| --- | --- | --- | --- |
+| `myapp-gateway` | `myapp.gateway` | 5100 | 8080 |
+| `myapp-apihost` | `myapp.apihost` | 5101 | 8080 |
+| `myapp-invoicesapi` | `myapp.invoicesapi` | 5102 | 8080 |
+| `myapp-ordersapi` | `myapp.ordersapi` | 5103 | 8080 |
+| `myapp-shippingapi` | `myapp.shippingapi` | 5104 | 8080 |
+
+**Why one compose file instead of five terminals:**
+
+| Problem with five terminals | What the compose file does instead |
 | --- | --- |
-| ApiHost first | Creates/migrates the module databases, seeds the admin user, and declares exchanges/queues |
-| OrdersApi next | Starts the product-event consumer before you create a product |
-| Invoices/Shipping next | Start the order-event consumers before you place an order |
-| Gateway last | It only forwards; it does not own state |
+| Five commands, five working directories | One `up -d` from the repo root |
+| Each host needs `localhost` connection strings | Compose DNS names: `rabbitmq`, `elasticsearch`, `otel-collector` |
+| SQLite files live in the source tree | Named volumes mount at `/data` inside each container |
+| Ports and env vars repeated manually | Declared once, next to the service |
+| Gateway needs backend URLs | `OpenApi__*BaseUrl` and YARP destinations point at container names |
+| Hard to stop everything | `docker compose ... down` |
 
-Wait for each `/health` to return 200 before moving on:
+**How the container environment differs from `dotnet run`:**
+
+| Setting | Local `dotnet run` | Inside compose |
+| --- | --- | --- |
+| RabbitMQ | `amqp://guest:guest@localhost:5672` | `amqp://guest:guest@rabbitmq:5672` |
+| Elasticsearch | `http://localhost:9200` | `http://elasticsearch:9200` |
+| OTLP endpoint | `http://localhost:4317` | `http://otel-collector:4317` |
+| SQLite | `Data Source=orders.db` | `Data Source=/data/orders.db` |
+| Gateway → ApiHost | `http://localhost:5101` | `http://myapp-apihost:8080` |
+
+### 4.2 Alternative: run hosts with `dotnet run`
+
+Use this when you are actively debugging with a debugger or `dotnet watch`. Stop the compose host services first, or they will hold the ports and RabbitMQ consumers:
+
+```bash
+# From MyApp/
+docker compose -f docker-compose.dev.yml stop \
+  myapp-apihost myapp-ordersapi myapp-invoicesapi myapp-shippingapi myapp-gateway
+```
+
+Then, from `MyApp/backend/`, run the hosts in this order in separate terminals:
+
+```bash
+dotnet run --project src/Services/MyApp.ApiHost     --urls http://localhost:5101
+dotnet run --project src/Services/MyApp.OrdersApi   --urls http://localhost:5103
+dotnet run --project src/Services/MyApp.InvoicesApi --urls http://localhost:5102
+dotnet run --project src/Services/MyApp.ShippingApi --urls http://localhost:5104
+dotnet run --project src/Services/MyApp.Gateway     --urls http://localhost:5100
+```
+
+ApiHost first because it owns schema, seed data, exchanges, and queues. Wait for each `/health` to return 200:
 
 ```bash
 for port in 5101 5103 5102 5104 5100; do
@@ -850,9 +958,7 @@ for port in 5101 5103 5102 5104 5100; do
 done
 ```
 
-If a service fails on startup, check its terminal. The usual causes are a missing RabbitMQ connection string or Elasticsearch not being ready yet.
-
-**Important:** stop these hosts before running `dotnet test tests/MyApp.Tests.Integration`. The test hosts use the same durable RabbitMQ queues, and a manually running consumer will steal messages from the test.
+**Important:** stop both compose hosts and `dotnet run` hosts before running `dotnet test tests/MyApp.Tests.Integration`. The test hosts use the same durable RabbitMQ queues, and a running consumer will steal messages from the test.
 
 ---
 
@@ -1033,7 +1139,7 @@ If you want error codes on the span, add `IReadOnlyList<Error> Errors` to `IErro
 
 ## 8. Generate traffic
 
-**Prerequisite:** the hosts from §4.1 are running and their `/health` endpoints return 200. If they are not, start them first; traffic generation against stopped hosts produces no telemetry.
+**Prerequisite:** the stack from §1.8 is running, or the hosts from §4.2 are running locally, and their `/health` endpoints return 200. If they are not, start them first; traffic generation against stopped hosts produces no telemetry.
 
 **What each request demonstrates:**
 
@@ -1222,12 +1328,8 @@ curl -s -G "http://localhost:3100/loki/api/v1/query_range" \
 From the `MyApp/` folder:
 
 ```bash
-# Observability stack
-docker compose -f observability-dev/docker-compose.yml down      # keep data
-docker compose -f observability-dev/docker-compose.yml down -v   # delete data
-
-# RabbitMQ + Elasticsearch
-docker compose -f backend/docker-compose.yml down
+docker compose -f docker-compose.dev.yml down      # keep volumes
+docker compose -f docker-compose.dev.yml down -v   # delete volumes (databases, traces, logs, metrics)
 ```
 
 The .NET side is additive: remove the `AddMyAppObservability` calls, the project reference, and the package versions to revert.
@@ -1238,15 +1340,14 @@ The .NET side is additive: remove the `AddMyAppObservability` calls, the project
 
 ```bash
 # ─── From MyApp/ ───────────────────────────────────────────
-docker compose -f backend/docker-compose.yml up -d
-docker compose -f observability-dev/docker-compose.yml up -d
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml logs -f myapp-apihost
 
-# ─── From MyApp/backend/ (separate terminals) ──────────────
-dotnet run --project src/Services/MyApp.ApiHost     --urls http://localhost:5101
-dotnet run --project src/Services/MyApp.OrdersApi   --urls http://localhost:5103
-dotnet run --project src/Services/MyApp.InvoicesApi --urls http://localhost:5102
-dotnet run --project src/Services/MyApp.ShippingApi --urls http://localhost:5104
-dotnet run --project src/Services/MyApp.Gateway     --urls http://localhost:5100
+# Health
+for port in 5100 5101 5102 5103 5104; do
+  curl -s -o /dev/null -w "$port -> %{http_code}\n" http://localhost:$port/health
+done
 
 # ─── Traffic ───────────────────────────────────────────────
 TOKEN=$(curl -s -X POST http://localhost:5101/auth/login \

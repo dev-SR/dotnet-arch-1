@@ -2178,25 +2178,34 @@ Use the same shape for the latency SLO (replace the numerator with `service:http
 
 ## 17. Dev workflow
 
-### 17.1 Bring the stack up
+### 17.1 Bring the stack up (local dev)
+
+The dev stack is one file at the repo root. It includes RabbitMQ, Elasticsearch, the observability stack, and all five .NET hosts:
 
 ```bash
-# 1. Kit's RabbitMQ + ES (if you need them)
-docker compose up -d
+# From MyApp/
+docker compose -f docker-compose.dev.yml up -d --build
 
-# 2. Observability stack
-cd observability
-docker compose -f docker-compose.observability.yml up -d
-
-# 3. Verify
-docker compose -f docker-compose.observability.yml ps
+# Verify
+docker compose -f docker-compose.dev.yml ps
 curl -s http://localhost:9090/-/healthy   # Prometheus
 curl -s http://localhost:3100/ready       # Loki
 curl -s http://localhost:3200/ready       # Tempo
 open http://localhost:3000                # Grafana (admin/admin)
 ```
 
-### 17.2 Run a host
+The production topology in §5–§6 uses the separate `observability/` compose file with agent + gateway. Do not run both stacks at once; they use the same host ports.
+
+### 17.2 Run one host locally (debugging)
+
+Stop the compose host first, or it will hold the port and the RabbitMQ consumer:
+
+```bash
+# From MyApp/
+docker compose -f docker-compose.dev.yml stop myapp-apihost
+```
+
+Then:
 
 ```bash
 cd src/Services/MyApp.ApiHost
@@ -3591,7 +3600,7 @@ Do not add `WolverineFx.OpenTelemetry`; it does not exist.
 - [ ] Each host's `Program.cs` calls `AddMyAppObservability(...)` once (an `Add*` call, not middleware)
 - [ ] `appsettings.json` + `.env` set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_DEPLOYMENT_ENVIRONMENT`
 - [ ] Every host registers `.AddSource("Wolverine")` and `.AddMeter("Wolverine*")`
-- [ ] `docker-compose.observability.yml` runs clean locally
+- [ ] `docker compose -f docker-compose.dev.yml up -d --build` runs the full dev stack locally
 - [ ] `agent.yaml` + `gateway.yaml` configs reviewed against your traffic (queue sizes, sampling)
 - [ ] Loki `distributor.otlp_config.default_resource_attributes_as_index_labels` is a short, low-cardinality list
 - [ ] Prometheus `--web.enable-remote-write-receiver` + `exemplar-storage` set
