@@ -10,6 +10,7 @@
 #
 # Environment:
 #   INTERVAL=5             seconds between cycles
+#   ERROR_RATE=20          percent of cycles that also request a deliberate 500
 #   API_HOST=http://localhost:5101
 #   ORDERS_HOST=http://localhost:5103
 #   EMAIL=admin@example.com
@@ -21,6 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 API_HOST="${API_HOST:-http://localhost:5101}"
 ORDERS_HOST="${ORDERS_HOST:-http://localhost:5103}"
 INTERVAL="${INTERVAL:-5}"
+ERROR_RATE="${ERROR_RATE:-20}"
 EMAIL="${EMAIL:-admin@example.com}"
 PASSWORD="${PASSWORD:-ChangeMe-12345}"
 PID_FILE="${PID_FILE:-$SCRIPT_DIR/.generate-traffic.pid}"
