@@ -169,7 +169,7 @@ The structure matters: parent/child means "the child happened *because of* the p
 
 A **metric** is a numeric time series identified by:
 - a **name** (`http.server.request.duration`)
-- a set of **labels** (`http_route=POST /products`, `http_status_code=201`, `service_name=myapp.apihost`)
+- a set of **labels** (`http_route=POST /products`, `http_response_status_code=201`, `service_name=myapp.apihost`)
 - a **data point** (counter increment, histogram bucket, gauge value)
 
 Unlike traces (one per request) or logs (one per event), metrics are **pre-aggregated** in the app: 1000 identical requests produce one counter value of 1000, not 1000 separate records. That's why metrics are cheap and always-on.
@@ -979,7 +979,7 @@ public sealed class RouteAwareSampler : Sampler
     public override SamplingResult ShouldSample(in SamplingParameters parameters)
     {
         // SamplingParameters includes Tags (early attributes) at span creation
-        var method = GetTag(parameters.Tags, "http.method") as string;
+        var method = GetTag(parameters.Tags, "http.request.method") as string;
         var route = GetTag(parameters.Tags, "http.route") as string;
 
         // Only apply to HTTP server spans
@@ -1018,7 +1018,7 @@ otel.WithTracing(t => t
 );
 ```
 
-**Caveat:** head sampling decides **before** the span has attributes like `http.status_code` or `error`. You can't head-sample "all errors" because you don't know yet if the request will error. That's what tail sampling is for.
+**Caveat:** head sampling decides **before** the span has attributes like `http.response.status_code` or `error`. You can't head-sample "all errors" because you don't know yet if the request will error. That's what tail sampling is for.
 
 ### F.3 Custom sampler — when + how
 
@@ -1069,7 +1069,7 @@ tail_sampling:
     - name: writes
       type: string_attribute
       string_attribute:
-        key: http.method
+        key: http.request.method
         values: [POST, PUT, PATCH, DELETE]       # 100% of write traces
 
     - name: baseline

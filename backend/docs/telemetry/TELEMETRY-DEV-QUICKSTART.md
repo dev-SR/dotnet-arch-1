@@ -1422,7 +1422,7 @@ curl -s -u admin:admin http://localhost:3000/api/datasources \
 curl -s http://localhost:9093/-/healthy
 ```
 
-Prometheus label names are sanitized: `service.name` becomes `service_name`, `http.route` becomes `http_route`, `http.status_code` becomes `http_status_code`. Use the sanitized names in PromQL.
+Prometheus label names are sanitized: `service.name` becomes `service_name`, `http.route` becomes `http_route`, `http.response.status_code` becomes `http_response_status_code`. Use the sanitized names in PromQL.
 
 ```promql
 # Request rate per route
@@ -1463,6 +1463,8 @@ Those links only work if the datasource `uid`s and the `trace_id` field are conf
 6. Click a span to see its attributes on the right.
 7. Click **Logs for this trace** to jump to Loki with the trace id applied.
 8. Switch the datasource to **Loki**, run `{service_name="myapp.apihost"}`, expand a log line, and click **View trace** to return to Tempo.
+
+Two dashboards are provisioned automatically under the **MyApp** folder: **Service Overview** and **Traces & Messaging**. For a panel-by-panel guide, including how to read p95, error rate, GC, and the trace waterfall, see [TELEMETRY-DASHBOARDS.md](./TELEMETRY-DASHBOARDS.md).
 
 If the log→trace link does not appear, check that Loki received `trace_id` as structured metadata:
 

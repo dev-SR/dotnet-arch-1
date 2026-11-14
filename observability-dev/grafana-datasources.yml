@@ -34,6 +34,11 @@ datasources:
         tags: ['service.name']
       nodeGraph:
         enabled: true
+      # Tempo's HTTP API is on :3200. Disable gRPC streaming so Grafana does not
+      # try to speak HTTP/2 gRPC to that port.
+      streamingEnabled:
+        search: false
+        metrics: false
 
   - name: Alertmanager
     type: alertmanager

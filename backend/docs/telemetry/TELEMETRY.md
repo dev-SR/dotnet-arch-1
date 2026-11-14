@@ -1093,7 +1093,7 @@ internal sealed class RouteAwareRootSampler : Sampler
     public override SamplingResult ShouldSample(in SamplingParameters parameters)
     {
         var method = parameters.Tags?
-            .FirstOrDefault(t => t.Key == "http.method")
+            .FirstOrDefault(t => t.Key == "http.request.method")
             .Value as string;
 
         if (method is null)
@@ -1214,7 +1214,7 @@ services.AddPipelineBehavior(typeof(ErrorTracingBehavior<,>));   // ← NEW — 
 | `http.server.response.body.size` | histogram | same |
 | `aspnetcore.routing.matches` | counter | same |
 
-Each carries: `http.route`, `http.method`, `http.status_code`, `url.scheme`, `network.protocol.version`.
+Each carries: `http.route`, `http.request.method`, `http.response.status_code`, `url.scheme`, `network.protocol.version`.
 
 ### 8.2 Runtime + process metrics (free)
 
@@ -1222,7 +1222,7 @@ GC, ThreadPool, memory, allocations, Kestrel connections — `OpenTelemetry.Inst
 
 The ones worth dashboarding:
 
-- `process.runtime.dotnet.gc.heap.size` (per generation)
+- `dotnet_gc_last_collection_heap_size_bytes` (current heap size)
 - `process.runtime.dotnet.gc.collections.count` (per generation)
 - `process.runtime.dotnet.thread_pool.thread.count`
 - `process.runtime.dotnet.thread_pool.queue.length` ← headroom indicator
@@ -1399,7 +1399,7 @@ The kit uses `Counter` (§8.5) and `Histogram` (§8.6) in Catalog, `UpDownCounte
 
 | Span | Source | Tags you'll see in Tempo |
 |---|---|---|
-| `POST /products` | ASP.NET Core | `http.route`, `http.method`, `http.status_code`, `myapp.endpoint_name`, `url.scheme` |
+| `POST /products` | ASP.NET Core | `http.route`, `http.request.method`, `http.response.status_code`, `myapp.endpoint_name`, `url.scheme` |
 | `Products.CreateProduct` | Custom (`CatalogActivitySource`) | `category` |
 | `Product.Create` | Custom | depends on tags you add |
 | `DbContext.SaveChangesAsync` | EF Core | `db.system=sqlite`, `db.statement=redacted`, `myapp.db.command_type` |
@@ -1630,7 +1630,7 @@ loki:
           - trace_id           # NOT a label — but kept as structured metadata
           - span_id            # for the Grafana log→trace link
           - http.route
-          - http.status_code
+          - http.response.status_code
           - wolverine.message_type
 
 schema_config:
@@ -1799,10 +1799,10 @@ groups:
     interval: 1m
     rules:
       # Prometheus label names cannot contain dots: service.name -> service_name,
-      # http.route -> http_route, http.status_code -> http_status_code.
+      # http.route -> http_route, http.response.status_code -> http_response_status_code.
       - record: service:http_requests:rate5m
         expr: |
-          sum by (service_name, http_route, http_status_code, deployment_environment)
+          sum by (service_name, http_route, http_response_status_code, deployment_environment)
           (rate(http_server_request_duration_seconds_count{synthetic!="true"}[5m]))
 
       - record: service:http_request_duration:p95_5m
@@ -1820,7 +1820,7 @@ groups:
       - record: service:http_errors:rate5m
         expr: |
           sum by (service_name, deployment_environment)
-          (rate(http_server_request_duration_seconds_count{synthetic!="true",http_status_code=~"5.."}[5m]))
+          (rate(http_server_request_duration_seconds_count{synthetic!="true",http_response_status_code=~"5.."}[5m]))
 
       - record: service:wolverine_processed:rate5m
         expr: |
@@ -1842,7 +1842,7 @@ groups:
         expr: |
           (
             sum by (service_name, deployment_environment)
-            (rate(http_server_request_duration_seconds_count{synthetic!="true",http_status_code=~"5.."}[5m]))
+            (rate(http_server_request_duration_seconds_count{synthetic!="true",http_response_status_code=~"5.."}[5m]))
             /
             clamp_min(
               sum by (service_name, deployment_environment)
@@ -2038,8 +2038,8 @@ Drop a JSON file at `grafana/provisioning/dashboards/service-overview.json`. The
 | p50 / p95 / p99 | `service:http_request_duration:p95_5m{service_name="$service"}` (one per quantile) |
 | Error rate | `service:http_errors:rate5m{service_name="$service"}` |
 | Active requests | `http_server_active_requests{service_name="$service"}` |
-| GC pause time | `process_runtime_dotnet_gc_pause_time_seconds_sum` |
-| Thread pool queue | `process_runtime_dotnet_thread_pool_queue_length` |
+| GC pause time | `dotnet_gc_pause_time_seconds_total` |
+| Thread pool queue | `dotnet_thread_pool_queue_length_total` |
 | Wolverine throughput | `service:wolverine_processed:rate5m{service_name="$service"}` |
 | Recent traces ( Tempo panel ) | Tempo datasource → service query |
 | Recent logs ( Loki panel ) | Loki datasource → `{service_name="$service"} \| json` |
@@ -2158,13 +2158,13 @@ A "multi-window multi-burn-rate" alert (short + long window) is the right patter
 - alert: SLOAvailabilityBurnRateFast
   expr: |
     (
-      sum by (service_name) (rate(http_server_request_duration_seconds_count{http_status_code=~"5.."}[5m]))
+      sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
       /
       clamp_min(sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])), 1e-9)
     ) > 0.0144   # 14.4x burn → uses 2% of monthly budget in 1h
     and
     (
-      sum by (service_name) (rate(http_server_request_duration_seconds_count{http_status_code=~"5.."}[1h]))
+      sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h]))
       /
       clamp_min(sum by (service_name) (rate(http_server_request_duration_seconds_count[1h])), 1e-9)
     ) > 0.0144
@@ -2422,7 +2422,7 @@ Prometheus stays local (or use Mimir / Thanos for HA).
 ### 19.1 Find a slow request in Grafana
 
 1. Open Grafana at **http://localhost:3000** (login `admin` / `admin`). Tempo has no separate UI; its `:3200` port is an API. In Grafana choose **Explore** → **Tempo**.
-2. TraceQL: `{ resource.service.name = "myapp.apihost" && span.http.status_code = 200 } | duration > 1s`
+2. TraceQL: `{ resource.service.name = "myapp.apihost" && span.http.response.status_code = 200 } | duration > 1s`
 3. Sort by duration, click the slowest span.
 4. Right panel → **Logs for this trace** (Loki) shows every log line tied to that `trace_id`.
 5. Right panel → **Metrics for this trace** shows the span-metrics time series.
@@ -2457,7 +2457,7 @@ sum by (http_route) (
 {service_name="myapp.apihost"} | json | trace_id = "0a65cfdb..."
 
 # Errors correlated with 5xx HTTP responses
-{service_name="myapp.apihost", level="Error"} | json | http_status_code =~ "5.."
+{service_name="myapp.apihost", level="Error"} | json | http_response_status_code =~ "5.."
 ```
 
 ### 19.5 TraceQL cookbook
@@ -2465,8 +2465,8 @@ sum by (http_route) (
 ```traceql
 # All slow POSTs to ApiHost
 { resource.service.name = "myapp.apihost"
-  && span.http.method = "POST"
-  && span.http.status_code = 201
+  && span.http.request.method = "POST"
+  && span.http.response.status_code = 201
 } | duration > 500ms
 
 # All Wolverine consumer spans that errored
@@ -2488,7 +2488,7 @@ histogram_quantile(0.95,
 
 # Error budget burn rate (99.9% SLO)
 1 - (
-  sum(rate(http_server_request_duration_seconds_count{http_status_code!~"5.."}[1h]))
+  sum(rate(http_server_request_duration_seconds_count{http_response_status_code!~"5.."}[1h]))
   /
   sum(rate(http_server_request_duration_seconds_count[1h]))
 )
@@ -3351,13 +3351,13 @@ Synthetic probes are **not real user traffic**. They must NOT contribute to your
 # Before:
 - record: service:http_requests:rate5m
   expr: |
-    sum by (service_name, http_route, http_status_code, deployment_environment)
+    sum by (service_name, http_route, http_response_status_code, deployment_environment)
     (rate(http_server_request_duration_seconds_count[5m]))
 
 # After:
 - record: service:http_requests:rate5m
   expr: |
-    sum by (service_name, http_route, http_status_code, deployment_environment)
+    sum by (service_name, http_route, http_response_status_code, deployment_environment)
     (rate(http_server_request_duration_seconds_count{synthetic!="true"}[5m]))
 ```
 
