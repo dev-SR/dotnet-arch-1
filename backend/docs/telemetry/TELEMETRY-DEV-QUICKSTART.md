@@ -913,7 +913,7 @@ docker compose -f docker-compose.dev.yml up -d --build \
 
 Or start the whole stack (infrastructure + observability + hosts):
 
-`````bash
+```bash
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
