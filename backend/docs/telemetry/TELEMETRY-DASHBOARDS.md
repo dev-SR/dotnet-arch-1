@@ -4,6 +4,8 @@ This is the **user manual** for the dashboards. It assumes the stack is already 
 
 Open Grafana at **http://localhost:3000** and log in with `admin` / `admin`.
 
+If you are **using** the dashboards, read §1–§8. If you are **generating or editing** them (including with an AI agent), jump to the optional §9.
+
 ---
 
 ## 1. Find the dashboards
@@ -168,3 +170,141 @@ These are intentional gaps, not bugs:
 - Production retention, sampling, and cost.
 
 The dashboards are for learning the flow and for local debugging. They are not a production SLO dashboard.
+---
+
+## 9. Optional: how these dashboards are generated (maintainers / AI agents)
+
+**You do not need this section to use the dashboards.** It is here so a future change can be made safely, especially when an AI agent regenerates the JSON.
+
+### The provisioning chain
+
+Grafana does not read the JSON from the repository directly. The chain is:
+
+1. `observability-dev/grafana-dashboards.yml` tells Grafana to load dashboards from `/etc/grafana/dashboards` into the **MyApp** folder.
+2. `docker-compose.dev.yml` mounts:
+   - `observability-dev/grafana-dashboards.yml` → `/etc/grafana/provisioning/dashboards/dashboards.yml`
+   - `observability-dev/dashboards` → `/etc/grafana/dashboards`
+3. Grafana reads every `*.json` in that folder and creates or updates the dashboard by `uid`.
+
+The provider is set to `updateIntervalSeconds: 30`, so file changes are picked up automatically. Restart Grafana when changing the provider file itself.
+
+### Why JSON instead of clicking in the UI
+
+The dashboards contain 14 and 6 panels. Building them by hand in the UI is slow and easy to get wrong. The JSON is also reviewable, diffable, and repeatable. The files are the source of truth.
+
+The one-off generator script used to create the first version was not committed; the JSON is what matters. If you regenerate, treat the JSON as the artifact and commit that.
+
+### What to verify before generating or editing
+
+Do not invent metric or label names. Check them against the running Prometheus first.
+
+List the metric names:
+
+```bash
+curl -s http://localhost:9090/api/v1/label/__name__/values \
+  | jq -r '.data[]' | grep -E 'myapp|http_server|dotnet|wolverine'
+```
+
+Inspect the labels on a specific metric:
+
+```bash
+curl -s "http://localhost:9090/api/v1/query?query=http_server_request_duration_seconds_count" \
+  | jq '.data.result[0].metric'
+```
+
+For this stack the important names are:
+
+- `http_server_request_duration_seconds_count`, `_bucket`, `_sum`
+- `http_server_active_requests`
+- `http_response_status_code` (not `http_status_code`)
+- `http_route` (not `http.route`)
+- `myapp_catalog_products_created_total`
+- `myapp_catalog_create_duration_milliseconds_bucket`
+- `myapp_orders_created_total`
+- `myapp_orders_active`
+- `dotnet_gc_last_collection_heap_size_bytes`
+- `dotnet_gc_pause_time_seconds_total`
+- `dotnet_thread_pool_queue_length_total`
+- `wolverine_messages_received_Messages_total`
+- `wolverine_messages_sent_Messages_total`
+- `wolverine_outbox_count_Messages`
+- `wolverine_inbox_count_Messages`
+
+### Dashboard JSON anatomy
+
+A dashboard is one JSON object. The fields that matter most:
+
+- `uid` is the stable URL id. Do not change it after people bookmark the dashboard.
+- `title` is the display name.
+- `time` is the default range (`now-1h`).
+- `refresh` is the auto-refresh interval (`15s`).
+- `templating.list` defines the **Service** dropdown. Its query is `label_values(http_server_request_duration_seconds_count, service_name)`.
+- `panels` is the list of panels. Each panel has `id`, `type`, `title`, `gridPos`, `datasource`, `targets`, and `fieldConfig`.
+- `targets[].expr` is the query. For Prometheus it is PromQL; for Loki it is LogQL; for Tempo it is TraceQL.
+- `datasource.uid` must match the UIDs in `grafana-datasources.yml` (`prometheus`, `loki`, `tempo`).
+
+Minimal example:
+
+```json
+{
+  "uid": "example",
+  "title": "Example",
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request rate",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_request_duration_seconds_count[5m]))"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Safe regeneration steps
+
+1. Confirm the metric and label names against Prometheus, as shown above.
+2. Generate or edit the JSON.
+3. Validate it:
+
+   ```bash
+   jq empty observability-dev/dashboards/myapp-service-overview.json
+   ```
+
+4. Restart Grafana:
+
+   ```bash
+   docker compose -f docker-compose.dev.yml restart grafana
+   ```
+
+5. Confirm the dashboard is registered:
+
+   ```bash
+   curl -s -u admin:admin "http://localhost:3000/api/search?query=MyApp" \
+     | jq -r '.[] | [.title, .uid] | @tsv'
+   ```
+
+6. Open the dashboard and check every panel for a red error or “No data”.
+
+### Notes for AI agents
+
+- Query Prometheus for real metric names before writing a target. Do not copy names from another stack.
+- Keep `uid` stable. Changing it creates a second dashboard and breaks links.
+- Use the datasource UIDs `prometheus`, `loki`, and `tempo`; they are defined in `grafana-datasources.yml`.
+- Use `http_response_status_code`, not `http_status_code`, and `http_route`, not `http.route`, in PromQL.
+- Use `service_name` in PromQL and `service.name` in TraceQL; they are different systems.
+- Use `dotnet_*` runtime metric names, not `process_runtime_dotnet_*`.
+- The Tempo traces panel is a dashboard table target. If a Grafana build rejects it, fall back to an Explore link rather than inventing a different query type.
+- Validate with `jq empty` and check the Grafana search API after restart.
+
+### Editing from the Grafana UI
+
+You can edit a provisioned dashboard in the UI because `allowUiUpdates` is `true`. If you want that change to survive a rebuild or another environment, export the dashboard JSON and copy it back into `observability-dev/dashboards`. The file, not the Grafana database, is the durable source.
