@@ -1276,7 +1276,7 @@ The commands in §8 are one-shot. For dashboards and traces that stay populated,
 From `MyApp/`:
 
 ```bash
-# Start in the background (default: one cycle every 15 seconds)
+# Start in the background (default: one cycle every 3 seconds)
 ./backend/scripts/generate-traffic.sh start
 
 # Check whether it is running
@@ -1304,7 +1304,7 @@ If you prefer to keep it in the foreground, use `run` and press `Ctrl+C` to stop
 5. Adds the product to the cart.
 6. Places an order, which triggers the Invoices and Shipping consumers.
 
-Then it sleeps for `INTERVAL` seconds and starts again.
+Then it sleeps for `INTERVAL` seconds and starts again. The default is 3 seconds; use `INTERVAL=15` for a slower pace.
 
 **Change the pace or targets:**
 
