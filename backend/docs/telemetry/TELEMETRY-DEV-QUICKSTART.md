@@ -1277,17 +1277,81 @@ Each check proves one link in the chain. Work from the app outward.
 
 ### 9.1 Check it in the UI (no `curl` needed)
 
-Start with Grafana. Open **http://localhost:3000** and sign in with `admin` / `admin`. If the login page does not load, the Grafana container is not ready yet; check `docker compose -f docker-compose.dev.yml ps`.
+Do these checks in order. Each one proves that one link in the chain is working.
 
-**Check the datasources first.** In the left sidebar, open **Connections → Data sources**. You should see Prometheus, Loki, Tempo, and Alertmanager. Open each one and click **Test** (or **Save & test**). A green success message means Grafana can reach that backend. If one fails, the container is down or the URL in §1.6 is wrong.
+#### A. Open Grafana
 
-**Check metrics.** Click **Explore** in the left sidebar. In the datasource selector at the top, choose **Prometheus**. Type `up` in the query box and click **Run query**. You should see one series with value `1` for the collector. Now replace `up` with `http_server_request_duration_seconds_count` and run it again. You should see series labelled with `service_name` and `http_route`. If the result is empty, generate traffic first (§8) and set the time range in the top-right corner to **Last 15 minutes**.
+1. Open **http://localhost:3000**.
+2. Log in with `admin` / `admin`.
+3. If the login page does not load, run `docker compose -f docker-compose.dev.yml ps` and wait until `grafana` says `Up`.
 
-**Check logs.** In Explore, choose **Loki** as the datasource. Enter `{service_name="myapp.apihost"}` and click **Run query**. Switch the result view from Table to **Logs** if necessary. You should see request logs. Expand one line: the structured fields include the trace id. If there are no logs, confirm the collector is running and that the time range covers your request.
+#### B. Check the datasources
 
-**Check traces.** In Explore, choose **Tempo**. Set **Query type** to **Search**, enter **Service Name** `myapp.apihost`, and click **Run query**. You should see trace rows. Click the one named `POST /products`. The waterfall opens: the top bar is the HTTP request, and the bars below it are the custom `CreateProduct` span, EF Core work, and Wolverine send/receive spans. Click any span to see its attributes on the right.
+1. In the left sidebar, click **Connections**.
+2. Click **Data sources**.
+3. You should see **Prometheus**, **Loki**, **Tempo**, and **Alertmanager**.
+4. Open **Prometheus** and click **Test** (or **Save & test** at the bottom). You should get a green success message.
+5. Repeat for **Loki**, **Tempo**, and **Alertmanager**.
 
-**Check the supporting UIs.** Open **http://localhost:9093** for Alertmanager; it should load with no firing alerts. Open **http://localhost:15672** and log in with `guest` / `guest`, then open **Queues**; you should see the product and order queues with consumers. The collector’s raw metrics are at **http://localhost:8889/metrics**; that page is plain text, not a dashboard.
+If one fails, that backend container is down, or the URL in §1.6 is wrong.
+
+#### C. Check metrics
+
+1. In the left sidebar, click **Explore** (the compass icon).
+2. At the top of the page, open the datasource dropdown and choose **Prometheus**.
+3. In the query box, type `up`.
+4. Click **Run query** in the top-right corner.
+5. You should see one series with value `1` for the collector.
+6. Replace `up` with `http_server_request_duration_seconds_count` and click **Run query** again.
+7. You should see series labelled with `service_name` and `http_route`.
+
+If the result is empty, generate traffic first (§8), then set the time range in the top-right corner to **Last 15 minutes**.
+
+#### D. Check logs
+
+1. Stay in **Explore**.
+2. Open the datasource dropdown and choose **Loki**.
+3. Enter this query:
+
+   ```logql
+   {service_name="myapp.apihost"}
+   ```
+
+4. Click **Run query**.
+5. If the result shows a table, switch the view selector to **Logs**.
+6. You should see request log lines. Expand one line and look for the `trace_id` field.
+
+If there are no logs, confirm the collector is running and that the time range covers your request.
+
+#### E. Check traces
+
+1. Stay in **Explore**.
+2. Open the datasource dropdown and choose **Tempo**.
+3. Set **Query type** to **Search**.
+4. Enter:
+   - **Service Name:** `myapp.apihost`
+   - **Span Name:** `POST /products`
+5. Click **Run query**.
+6. You should see one or more `POST /products` rows.
+7. Click the row whose **Start time** matches when you ran the request.
+
+The waterfall opens:
+
+- The top bar is the HTTP request.
+- `CreateProduct` is the custom Catalog span.
+- `savechanges` is EF Core.
+- `send ProductCreated` is the Wolverine producer.
+- `receive ProductCreated` is the consumer in `myapp.ordersapi`.
+
+Click any span to see its attributes on the right.
+
+#### F. Check the supporting UIs
+
+1. Open **http://localhost:9093** for Alertmanager. The page should load; no alerts should be firing.
+2. Open **http://localhost:15672** for RabbitMQ.
+3. Log in with `guest` / `guest`.
+4. Click **Queues**. You should see `orders.product-events`, `invoices.order-events`, and `shipping.order-events`, each with a consumer.
+5. Open **http://localhost:8889/metrics** for the collector. This page is plain text, not a dashboard; use it only when debugging the collector.
 
 ### 9.2 API checks
 
