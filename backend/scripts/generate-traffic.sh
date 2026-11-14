@@ -9,7 +9,7 @@
 #   ./backend/scripts/generate-traffic.sh run      # foreground (Ctrl+C)
 #
 # Environment:
-#   INTERVAL=3             seconds between cycles
+#   INTERVAL=5             seconds between cycles
 #   API_HOST=http://localhost:5101
 #   ORDERS_HOST=http://localhost:5103
 #   EMAIL=admin@example.com
@@ -20,7 +20,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 API_HOST="${API_HOST:-http://localhost:5101}"
 ORDERS_HOST="${ORDERS_HOST:-http://localhost:5103}"
-INTERVAL="${INTERVAL:-3}"
+INTERVAL="${INTERVAL:-5}"
 EMAIL="${EMAIL:-admin@example.com}"
 PASSWORD="${PASSWORD:-ChangeMe-12345}"
 PID_FILE="${PID_FILE:-$SCRIPT_DIR/.generate-traffic.pid}"
