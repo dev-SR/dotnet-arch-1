@@ -1342,6 +1342,28 @@ If the result is empty, generate traffic first (§8), then set the time range in
 
 If there are no logs, confirm the collector is running and that the time range covers your request.
 
+**If Grafana says “No logs volume available” or “No volume information available”,** that message is about the small histogram above the logs, not about the log lines themselves. Do this:
+
+1. Set the time range in the top-right corner to **Last 1 hour** (or **Last 6 hours**).
+2. Click **Run query** again.
+3. Look at the **Logs** result tab, not the volume panel.
+
+If the Logs tab is still empty, widen the query to prove Loki has anything:
+
+```logql
+{service_name=~".+"}
+```
+
+Then narrow it back to `{service_name="myapp.apihost"}`. You can also check the labels directly:
+
+```bash
+curl -s http://localhost:3100/loki/api/v1/label/service_name/values | jq -r '.data[]'
+```
+
+You should see `myapp.apihost`, `myapp.ordersapi`, `myapp.invoicesapi`, and `myapp.shippingapi`.
+
+If the volume histogram is distracting, set **Logs volume** to **None** in the Loki query options. The log lines still work.
+
 #### E. Check traces
 
 1. Stay in **Explore**.
