@@ -167,7 +167,7 @@ One dashboard-specific detail: when the **Service** variable is set to **All**, 
 These are intentional gaps, not bugs:
 
 - SLOs and error budgets.
-- Alert rules and Alertmanager routing.
+- Alert rules and Alertmanager routing beyond the two dev rules. See quickstart §9.3.
 - RabbitMQ broker metrics such as queue depth and consumer lag. Use the RabbitMQ UI at `http://localhost:15672`.
 - Elasticsearch cluster health. Use `http://localhost:9200`.
 - Per-user or per-tenant breakdowns.

@@ -913,7 +913,7 @@ docker compose -f docker-compose.dev.yml up -d --build \
 
 Or start the whole stack (infrastructure + observability + hosts):
 
-```bash
+`````bash
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
@@ -1523,6 +1523,65 @@ sum (myapp_catalog_products_created_total)
 # Orders currently placed
 myapp_orders_active{status="placed"}
 ```
+
+### 9.3 Alerting (Prometheus → Alertmanager)
+
+Alerting is a second pipeline on top of metrics:
+
+```text
+Prometheus evaluates rules
+        │
+        ▼
+Alertmanager receives firing alerts
+        │
+        ▼
+receiver (dev-null in this setup)
+```
+
+The alert **is visible in Prometheus and Alertmanager** even though the dev receiver does not send Slack/PagerDuty messages.
+
+**Where it is configured:**
+
+- `observability-dev/prometheus-rules.yml` contains the alert rules.
+- `observability-dev/prometheus.yml` points Prometheus at that rule file and at `alertmanager:9093`.
+- `observability-dev/alertmanager.yml` groups alerts and routes them to `dev-null`.
+
+The dev stack currently has two rules:
+
+- `MyAppHighErrorRate`: fires when a service returns 5xx for more than 5% of requests over 5 minutes, for 30 seconds.
+- `MyAppCollectorDown`: fires when Prometheus cannot scrape the collector for 1 minute.
+
+**See the rules and their state:**
+
+1. Open **http://localhost:9090**.
+2. Click **Alerts** in the top navigation.
+3. You will see `MyAppHighErrorRate` and `MyAppCollectorDown` with state `inactive`, `pending`, or `firing`.
+
+**Trigger an alert on purpose:**
+
+1. Start heavy error traffic:
+   ```bash
+   ERROR_RATE=100 INTERVAL=2 ./backend/scripts/generate-traffic.sh start
+   ```
+2. Wait about 45–75 seconds. Prometheus evaluates every 15 seconds, and the rule has a 30-second `for` period.
+3. Open **http://localhost:9090/alerts**. `MyAppHighErrorRate` should become `firing`.
+4. Open **http://localhost:9093**. Alertmanager should show the same alert.
+5. Stop the generator:
+   ```bash
+   ./backend/scripts/generate-traffic.sh stop
+   ```
+
+The alert resolves automatically after the error rate drops below the threshold for the rule window.
+
+**Why the alert is not sent anywhere:** `alertmanager.yml` routes to `dev-null`, a receiver with no configuration. That keeps the dev setup quiet. In production you replace it with a webhook, Slack, or PagerDuty receiver and add severity routes.
+
+**Alert states in one sentence each:**
+
+- `inactive`: the expression is false.
+- `pending`: the expression is true, but the `for` duration has not elapsed yet.
+- `firing`: the expression has been true for the full `for` duration; Alertmanager receives it.
+
+Grafana dashboards are not alerts. The error panels show you the symptom; the Prometheus rule decides when to notify.
 
 ---
 

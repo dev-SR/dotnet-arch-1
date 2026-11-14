@@ -23,6 +23,7 @@ services:
       - --enable-feature=exemplar-storage
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-rules.yml:/etc/prometheus/rules.yml:ro
       - prom-data:/prometheus
     restart: unless-stopped
 

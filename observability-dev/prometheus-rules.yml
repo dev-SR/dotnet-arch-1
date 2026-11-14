@@ -1,0 +1,31 @@
+groups:
+  - name: myapp-dev
+    interval: 15s
+    rules:
+      - alert: MyAppHighErrorRate
+        expr: |
+          (
+            sum by (service_name) (
+              rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])
+            )
+            /
+            clamp_min(
+              sum by (service_name) (
+                rate(http_server_request_duration_seconds_count[5m])
+              ), 1e-9)
+          ) > 0.05
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service_name }} has a 5xx rate above 5%"
+          description: "The service returned 5xx for more than 5% of requests over the last 5 minutes."
+
+      - alert: MyAppCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The OpenTelemetry collector is not being scraped"
+          description: "Prometheus cannot scrape otel-collector:8889. Telemetry may be dropping."
