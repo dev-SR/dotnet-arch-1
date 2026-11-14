@@ -115,3 +115,8 @@ prompt
 # Dev traffic generator runtime files
 backend/scripts/.generate-traffic.pid
 backend/scripts/.generate-traffic.log
+# Local SQLite databases (dev/runtime state)
+*.db
+*.db-shm
+*.db-wal
+
