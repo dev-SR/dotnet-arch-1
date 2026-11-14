@@ -156,6 +156,8 @@ Check these in order:
 6. **Loki logs.** “No logs volume available” is only the histogram. The **Logs** panel below it can still contain lines.
 7. **Tempo traces.** Tempo needs a few seconds to index a new trace. Re-run the query.
 
+One dashboard-specific detail: when the **Service** variable is set to **All**, the dashboards use `.+`, not `.*`. Loki rejects a query whose matcher can match an empty string, so `{service_name=~".*"}` returns an error and Grafana displays it as “No data”. The provisioned dashboards already use `.+`.
+
 ---
 
 ## 8. What these dashboards do not cover
