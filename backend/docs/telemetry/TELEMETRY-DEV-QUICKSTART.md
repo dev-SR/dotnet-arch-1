@@ -1322,7 +1322,23 @@ PASSWORD=ChangeMe-12345 \
 
 The PID and log files are `backend/scripts/.generate-traffic.pid` and `.generate-traffic.log`. They are git-ignored. `start` refuses to start a second copy; run `stop` first.
 
+**Simulate errors:**
+
+By default, 20% of cycles also call `GET /_diag/throw/unexpected`, which throws on purpose and returns a 500. That gives the error panels and the 5xx route panel real data.
+
+```bash
+# Every cycle produces a 500 (good for testing the error panels)
+ERROR_RATE=100 INTERVAL=5 ./backend/scripts/generate-traffic.sh start
+
+# Turn error simulation off
+ERROR_RATE=0 INTERVAL=15 ./backend/scripts/generate-traffic.sh start
+```
+
+The `_diag` endpoint is Development-only and requires the same bearer token; the script sends it. Use `ERROR_RATE` between 0 and 100. A value of 20 means roughly one error every five cycles.
+
 **Notes:**
+
+- It writes real products and orders to the dev SQLite databases.**Notes:**
 
 - It writes real products and orders to the dev SQLite databases. Reset them with `docker compose -f docker-compose.dev.yml down -v` if the data gets noisy.
 - The generator calls the HTTP APIs; it is not a RabbitMQ consumer. It is safe to leave running while you explore Grafana.

@@ -46,6 +46,8 @@ This dashboard answers: **“Is the service healthy, and what is it doing?”**
 
 **Error rate** is the share of requests that returned a 5xx status. `0%` is good. A sudden rise means the service is failing requests; click through to the **5xx rate by route** panel to see which route.
 
+If there are no 5xx responses, the panel shows `0`, not “No data”. To produce real errors for testing, start the traffic generator with `ERROR_RATE=100` (quickstart §8.2).
+
 **p95 latency** is the response time that 95% of requests are faster than. It is more useful than an average because a few slow requests do not disappear into the mean. If p95 is `250 ms`, 95 out of 100 requests finished in 250 ms or less.
 
 **Active requests** is how many requests are in flight right now. A steadily rising number can mean requests are piling up.

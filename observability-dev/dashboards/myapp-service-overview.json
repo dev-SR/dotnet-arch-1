@@ -113,13 +113,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_route!~\"/health.*|/openapi.*\",http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_route!~\"/health.*|/openapi.*\"}[5m])), 1e-9)",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_route!~\"/health.*|/openapi.*\",http_response_status_code=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_route!~\"/health.*|/openapi.*\"}[5m])), 1e-9)",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -341,7 +342,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_response_status_code=~\"5..\"}[5m]))",
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_response_status_code=~\"5..\"}[5m])) or vector(0)",
           "refId": "A",
           "legendFormat": "{{http_route}}"
         }
@@ -353,7 +354,8 @@
             "drawStyle": "line",
             "lineWidth": 1,
             "fillOpacity": 8
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },

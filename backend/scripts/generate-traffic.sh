@@ -29,6 +29,18 @@ LOG_FILE="${LOG_FILE:-$SCRIPT_DIR/.generate-traffic.log}"
 TOKEN=""
 TOKEN_TIME=0
 
+simulate_error() {
+  local code
+  code="$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer $TOKEN" \
+    "$API_HOST/_diag/throw/unexpected" || true)"
+  if [[ "$code" == "500" ]]; then
+    log "simulated error: HTTP 500"
+  else
+    log "simulated error attempt returned HTTP $code"
+  fi
+}
+
 log() {
   # stderr: create_product is called in command substitution, so only the
   # product id may go to stdout.
@@ -125,10 +137,13 @@ cycle() {
   product_id="$(create_product)" || return 0
   read_products
   place_order "$product_id"
+  if [[ "$ERROR_RATE" -gt 0 ]] && (( RANDOM % 100 < ERROR_RATE )); then
+    simulate_error
+  fi
 }
 
 run_loop() {
-  log "traffic generator starting: interval=${INTERVAL}s api=$API_HOST orders=$ORDERS_HOST"
+  log "traffic generator starting: interval=${INTERVAL}s error_rate=${ERROR_RATE}% api=$API_HOST orders=$ORDERS_HOST"
   trap 'log "traffic generator stopped"; exit 0' INT TERM
   while true; do
     cycle
@@ -149,7 +164,7 @@ start_bg() {
     return 0
   fi
   : > "$LOG_FILE"
-  INTERVAL="$INTERVAL" API_HOST="$API_HOST" ORDERS_HOST="$ORDERS_HOST" \
+  INTERVAL="$INTERVAL" ERROR_RATE="$ERROR_RATE" API_HOST="$API_HOST" ORDERS_HOST="$ORDERS_HOST" \
     EMAIL="$EMAIL" PASSWORD="$PASSWORD" PID_FILE="$PID_FILE" LOG_FILE="$LOG_FILE" \
     nohup bash "$0" run >>"$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
