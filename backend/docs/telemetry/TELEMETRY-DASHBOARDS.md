@@ -150,7 +150,7 @@ Check these in order:
 
 1. **Time range.** Use **Last 15 minutes** or **Last 1 hour**. An absolute range that is in the future or before your request returns nothing.
 2. **Service variable.** If you picked a service that has no traffic, the panel is empty. Set it to **All**.
-3. **Traffic.** Send a request from the quickstart, wait 15 seconds, and refresh.
+3. **Traffic.** Send a request from the quickstart, or start the continuous generator (`./backend/scripts/generate-traffic.sh start`). Wait 15 seconds and refresh.
 4. **Prometheus labels.** Open **Explore → Prometheus** and run `up`. If `up` is missing, Prometheus is not scraping the collector.
 5. **Collector.** Open `http://localhost:8889/metrics` and confirm the page has `otelcol_*` series.
 6. **Loki logs.** “No logs volume available” is only the histogram. The **Logs** panel below it can still contain lines.

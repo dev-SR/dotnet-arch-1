@@ -1269,6 +1269,75 @@ The `service.name` on a custom span is the host's resource, not the module name.
 
 For the order, you should see `myapp.ordersapi`, `myapp.invoicesapi`, and `myapp.shippingapi`.
 
+### 8.2 Continuous traffic generator (start/stop)
+
+The commands in §8 are one-shot. For dashboards and traces that stay populated, use the traffic generator. It loops until you stop it.
+
+From `MyApp/`:
+
+```bash
+# Start in the background (default: one cycle every 15 seconds)
+./backend/scripts/generate-traffic.sh start
+
+# Check whether it is running
+./backend/scripts/generate-traffic.sh status
+
+# Watch what it is doing
+tail -f backend/scripts/.generate-traffic.log
+
+# Stop it
+./backend/scripts/generate-traffic.sh stop
+```
+
+If you prefer to keep it in the foreground, use `run` and press `Ctrl+C` to stop:
+
+```bash
+./backend/scripts/generate-traffic.sh run
+```
+
+**What one cycle does:**
+
+1. Logs in as the seeded admin user. The token is refreshed automatically after about 8 minutes.
+2. Creates a unique product named `Load-<timestamp>-<random>`.
+3. Calls `GET /products` to generate a read span.
+4. Waits 2 seconds for OrdersApi to consume the product event.
+5. Adds the product to the cart.
+6. Places an order, which triggers the Invoices and Shipping consumers.
+
+Then it sleeps for `INTERVAL` seconds and starts again.
+
+**Change the pace or targets:**
+
+```bash
+# Every 5 seconds
+INTERVAL=5 ./backend/scripts/generate-traffic.sh start
+
+# Different host or credentials
+API_HOST=http://localhost:5101 \
+ORDERS_HOST=http://localhost:5103 \
+EMAIL=admin@example.com \
+PASSWORD=ChangeMe-12345 \
+./backend/scripts/generate-traffic.sh start
+```
+
+The PID and log files are `backend/scripts/.generate-traffic.pid` and `.generate-traffic.log`. They are git-ignored. `start` refuses to start a second copy; run `stop` first.
+
+**Notes:**
+
+- It writes real products and orders to the dev SQLite databases. Reset them with `docker compose -f docker-compose.dev.yml down -v` if the data gets noisy.
+- The generator calls the HTTP APIs; it is not a RabbitMQ consumer. It is safe to leave running while you explore Grafana.
+- If you run the integration tests, stop the compose hosts as described in §4.2. The generator alone does not hold queue consumers, but it will keep producing messages.
+
+### 8.3 Stop the generator before tearing down
+
+Tearing down the stack does not kill the generator process. Always do this first:
+
+```bash
+./backend/scripts/generate-traffic.sh stop
+```
+
+Then run the teardown command in §12.
+
 ---
 
 ## 9. Verify each component
@@ -1521,6 +1590,11 @@ docker compose -f docker-compose.dev.yml logs -f myapp-apihost
 for port in 5100 5101 5102 5103 5104; do
   curl -s -o /dev/null -w "$port -> %{http_code}\n" http://localhost:$port/health
 done
+
+# Continuous traffic (start/stop)
+./backend/scripts/generate-traffic.sh start
+./backend/scripts/generate-traffic.sh status
+./backend/scripts/generate-traffic.sh stop
 
 # ─── Traffic ───────────────────────────────────────────────
 TOKEN=$(curl -s -X POST http://localhost:5101/auth/login \

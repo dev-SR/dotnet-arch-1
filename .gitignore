@@ -111,3 +111,7 @@ prompt
 
 **/TestResults/
 **/coverage-report/
+
+# Dev traffic generator runtime files
+backend/scripts/.generate-traffic.pid
+backend/scripts/.generate-traffic.log
