@@ -74,22 +74,21 @@ Gateway :5100 ──► ApiHost :5101 ──► RabbitMQ ──► Search (in-pr
 
 ---
 
-## 0.1 Where to look (URLs and which ones have a UI)
+## 0.1 What each URL is for (read this first)
 
-**Grafana is the UI for traces and logs.** Tempo and Loki are storage/query backends; their ports serve APIs, not dashboards.
+There are several containers, but you only need one browser tab for most of this guide: **Grafana at http://localhost:3000**. Log in with `admin` / `admin`.
 
-| What | URL | UI? | Use it for |
-| --- | --- | --- | --- |
-| Grafana | http://localhost:3000 | Yes | Traces, logs, metrics, correlation (login `admin` / `admin`) |
-| Tempo | http://localhost:3200 | No, API | Trace search/read API; open traces in Grafana |
-| Loki | http://localhost:3100 | No, API | Log query API; open logs in Grafana |
-| Prometheus | http://localhost:9090 | Basic | PromQL queries and target status |
-| Alertmanager | http://localhost:9093 | Yes | Alerts and silences |
-| Collector metrics | http://localhost:8889/metrics | No, text | Raw collector/self metrics |
-| RabbitMQ | http://localhost:15672 | Yes | Queues, consumers, message rates (`guest` / `guest`) |
-| Elasticsearch | http://localhost:9200 | No, API | Search index health |
+Here is the mental model:
 
-The short version: **open Grafana, choose the datasource, then Explore.** You do not “open Tempo” in a browser; you open Grafana and use its Tempo datasource.
+- **Grafana** is the dashboard. It displays traces, logs, and metrics in one place. In Grafana, a **datasource** is a connection to a backend (Prometheus, Loki, or Tempo), and **Explore** is the ad-hoc query page where you type a query and see the result without building a dashboard first.
+- **Tempo** stores traces. It has no separate dashboard. The address `http://localhost:3200` is an API that Grafana calls. When someone says “open the trace in Tempo”, they mean “open Grafana, choose Tempo as the datasource, and search there”.
+- **Loki** stores logs. Like Tempo, `http://localhost:3100` is an API, not a UI. You read logs in Grafana.
+- **Prometheus** stores metrics and has a small built-in query page at `http://localhost:9090`. You can use it directly, but Grafana is usually nicer.
+- **Alertmanager** shows alerts at `http://localhost:9093`.
+- **RabbitMQ** has a management UI at `http://localhost:15672` (`guest` / `guest`). Use it to see queues and consumers.
+- The **collector** exposes its own metrics as raw text at `http://localhost:8889/metrics`. That page is for debugging, not normal use.
+
+If a URL does not load, the container is probably still starting. Check `docker compose -f docker-compose.dev.yml ps` and wait for `Up`.
 
 ---
 
@@ -1162,13 +1161,11 @@ If you want error codes on the span, add `IReadOnlyList<Error> Errors` to `IErro
 
 **What each request demonstrates:**
 
-| Request | What it shows |
-| --- | --- |
-| `POST /auth/login` | An HTTP server span, an EF Core span, and logs with a trace id |
-| `POST /products` | ApiHost → RabbitMQ → Search (in-process) and OrdersApi, plus the custom `CreateProduct` span and the product counter |
-| `GET /products` | A read-only request with no write transaction |
-| `PUT /cart/items` | A command in OrdersApi with its own trace |
-| `POST /orders` | OrdersApi → RabbitMQ → InvoicesApi and ShippingApi, with the order counter and active-order gauge |
+- `POST /auth/login` gives you an HTTP server span, an EF Core span, and logs with a trace id.
+- `POST /products` is the main distributed example: ApiHost saves the product, publishes an event, and both the in-process Search handler and OrdersApi consume it. It also produces the custom `CreateProduct` span and the product counter.
+- `GET /products` is a read-only request with no write transaction.
+- `PUT /cart/items` is a command in OrdersApi with its own trace.
+- `POST /orders` publishes an order event that InvoicesApi and ShippingApi consume, and updates the order counter and active-order gauge.
 
 **Catalog list parameters:** `page`, `pageSize`, `orderBy` (`Name`, `Price`, `StockQuantity`, `CreatedAt`), `desc` (`true`/`false`), `search`, `minPrice`, `maxPrice`, `inStockOnly`, `categoryId`, `brandId`, `tagId`.
 
@@ -1257,26 +1254,19 @@ For the order, you should see `myapp.ordersapi`, `myapp.invoicesapi`, and `myapp
 
 Each check proves one link in the chain. Work from the app outward.
 
-### 9.1 UI checks
+### 9.1 Check it in the UI (no `curl` needed)
 
-| Component | Where to click | What you should see |
-| --- | --- | --- |
-| Grafana | http://localhost:3000 → log in | Dashboards/Explore load |
-| Data sources | **Connections → Data sources** → open each → **Test** | Prometheus, Loki, Tempo, Alertmanager report success |
-| Prometheus | **Explore** → datasource **Prometheus** → query `up` → **Run query** | One series with value `1` for the collector |
-| Prometheus app metrics | Same datasource → `http_server_request_duration_seconds_count` | Series per `service_name` and `http_route` |
-| Loki | **Explore** → datasource **Loki** → `{service_name="myapp.apihost"}` → **Run query** | Log lines; expand one to see fields |
-| Tempo | **Explore** → datasource **Tempo** → **Search** → Service Name `myapp.apihost` → **Run query** | Trace rows; click one for the waterfall |
-| Alertmanager | http://localhost:9093 | Alertmanager UI loads; no firing alerts |
-| RabbitMQ | http://localhost:15672 (`guest` / `guest`) → **Queues** | `orders.product-events`, `invoices.order-events`, `shipping.order-events` with consumers |
-| Collector | http://localhost:8889/metrics | Text metrics page with `otelcol_*` series |
+Start with Grafana. Open **http://localhost:3000** and sign in with `admin` / `admin`. If the login page does not load, the Grafana container is not ready yet; check `docker compose -f docker-compose.dev.yml ps`.
 
-**UI navigation for the main flow:**
+**Check the datasources first.** In the left sidebar, open **Connections → Data sources**. You should see Prometheus, Loki, Tempo, and Alertmanager. Open each one and click **Test** (or **Save & test**). A green success message means Grafana can reach that backend. If one fails, the container is down or the URL in §1.6 is wrong.
 
-1. **Grafana → Explore → Tempo → Search → `myapp.apihost` → Run query → click trace.**
-2. In the trace, click the `CreateProduct` span. The right panel shows its attributes and events.
-3. Click **Logs for this trace** (Tempo → Loki). You should see the logs emitted during that trace.
-4. Go back to **Explore → Loki**, run `{service_name="myapp.apihost"}`, expand a log line, and click **View trace**.
+**Check metrics.** Click **Explore** in the left sidebar. In the datasource selector at the top, choose **Prometheus**. Type `up` in the query box and click **Run query**. You should see one series with value `1` for the collector. Now replace `up` with `http_server_request_duration_seconds_count` and run it again. You should see series labelled with `service_name` and `http_route`. If the result is empty, generate traffic first (§8) and set the time range in the top-right corner to **Last 15 minutes**.
+
+**Check logs.** In Explore, choose **Loki** as the datasource. Enter `{service_name="myapp.apihost"}` and click **Run query**. Switch the result view from Table to **Logs** if necessary. You should see request logs. Expand one line: the structured fields include the trace id. If there are no logs, confirm the collector is running and that the time range covers your request.
+
+**Check traces.** In Explore, choose **Tempo**. Set **Query type** to **Search**, enter **Service Name** `myapp.apihost`, and click **Run query**. You should see trace rows. Click the one named `POST /products`. The waterfall opens: the top bar is the HTTP request, and the bars below it are the custom `CreateProduct` span, EF Core work, and Wolverine send/receive spans. Click any span to see its attributes on the right.
+
+**Check the supporting UIs.** Open **http://localhost:9093** for Alertmanager; it should load with no firing alerts. Open **http://localhost:15672** and log in with `guest` / `guest`, then open **Queues**; you should see the product and order queues with consumers. The collector’s raw metrics are at **http://localhost:8889/metrics**; that page is plain text, not a dashboard.
 
 ### 9.2 API checks
 
@@ -1331,15 +1321,9 @@ myapp_orders_active{status="placed"}
 
 ## 10. Grafana tour
 
-**Explore is the investigation surface.** Each datasource gives you a different starting point:
+**Explore is the investigation surface.** Pick the datasource that matches your question. Start with Prometheus when you want to know *which route got slower*. Start with Tempo when you want to know *what happened in one request*. Start with Loki when you want to know *what the code logged*. Once you are inside a trace or a log line, use the links to pivot: Tempo has **Logs for this trace**, and Loki has **View trace**.
 
-| Start with | Ask | Then pivot |
-| --- | --- | --- |
-| Prometheus | “Which route got slower?” | Open a trace if exemplars are enabled |
-| Tempo | “What happened in this request?” | “Logs for this trace” |
-| Loki | “What did the code log?” | “View trace” using the `trace_id` field |
-
-The links only work if the datasource `uid`s and the `trace_id` field are configured correctly. That is why §1.6 uses stable `uid`s and `matcherType: label`.
+Those links only work if the datasource `uid`s and the `trace_id` field are configured correctly. That is why §1.6 uses stable `uid`s and `matcherType: label`.
 
 
 **Step-by-step:**

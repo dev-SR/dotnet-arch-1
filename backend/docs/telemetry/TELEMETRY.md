@@ -2417,7 +2417,7 @@ Prometheus stays local (or use Mimir / Thanos for HA).
 
 ### 19.1 Find a slow request in Grafana
 
-1. Open Grafana → **Explore** → Tempo.
+1. Open Grafana at **http://localhost:3000** (login `admin` / `admin`). Tempo has no separate UI; its `:3200` port is an API. In Grafana choose **Explore** → **Tempo**.
 2. TraceQL: `{ resource.service.name = "myapp.apihost" && span.http.status_code = 200 } | duration > 1s`
 3. Sort by duration, click the slowest span.
 4. Right panel → **Logs for this trace** (Loki) shows every log line tied to that `trace_id`.
