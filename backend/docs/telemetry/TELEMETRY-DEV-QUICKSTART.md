@@ -1285,15 +1285,34 @@ Do these checks in order. Each one proves that one link in the chain is working.
 2. Log in with `admin` / `admin`.
 3. If the login page does not load, run `docker compose -f docker-compose.dev.yml ps` and wait until `grafana` says `Up`.
 
-#### B. Check the datasources
+#### B. Check the datasources (they are already added)
+
+The four datasources are created automatically from `observability-dev/grafana-datasources.yml` when Grafana starts. **Do not click “Add new data source”.**
 
 1. In the left sidebar, click **Connections**.
-2. Click **Data sources**.
+2. Click the **Data sources** tab. Do not open **Add new connection**.
 3. You should see **Prometheus**, **Loki**, **Tempo**, and **Alertmanager**.
-4. Open **Prometheus** and click **Test** (or **Save & test** at the bottom). You should get a green success message.
-5. Repeat for **Loki**, **Tempo**, and **Alertmanager**.
+4. They are marked read-only because they come from the YAML file. That is expected; edit the YAML and restart Grafana if you need to change one.
+5. Open **Prometheus**, scroll to the bottom, and click **Test**. You should see a green success message.
+6. Repeat for **Loki**, **Tempo**, and **Alertmanager**.
 
-If one fails, that backend container is down, or the URL in §1.6 is wrong.
+**If you only see “Add new data source”**, you are on the **Add new connection** page. Go back and choose the **Data sources** tab. The datasources exist; you are just on the wrong page.
+
+**If the list is empty**, check what Grafana actually loaded:
+
+```bash
+curl -s -u admin:admin http://localhost:3000/api/datasources \
+  | jq '.[] | {name, type, uid}'
+```
+
+- If this prints four entries, the datasources exist and the browser page is stale; refresh with `Ctrl+Shift+R`.
+- If it prints `[]`, check `docker compose -f docker-compose.dev.yml logs grafana --tail 30` and confirm the YAML is mounted at `/etc/grafana/provisioning/datasources/datasources.yml`.
+
+After editing `grafana-datasources.yml`, apply it with:
+
+```bash
+docker compose -f docker-compose.dev.yml restart grafana
+```
 
 #### C. Check metrics
 
