@@ -1204,12 +1204,27 @@ curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:5103/orders
 sleep 3
 ```
 
-To find the trace id, query Tempo’s API — do not expect a `traceparent` response header:
+To find the trace id from the terminal, search for the exact span name. Tempo’s search API also needs a time range; without it, it only searches a short default window:
 
 ```bash
-curl -s "http://localhost:3200/api/search?tags=service.name%3Dmyapp.apihost&limit=1" \
-  | jq -r '.traces[0].traceID'
+# Linux:
+START=$(date -u -d '1 hour ago' +%s)
+# macOS: START=$(date -u -v-1H +%s)
+END=$(date -u +%s)
+
+curl -s -G "http://localhost:3200/api/search" \
+  --data-urlencode 'q={ resource.service.name = "myapp.apihost" && name = "POST /products" }' \
+  --data-urlencode "start=$START" \
+  --data-urlencode "end=$END" \
+  --data-urlencode 'limit=5' \
+  | jq -r '.traces[] | [.traceID, .startTimeUnixNano, .durationMs] | @tsv'
 ```
+
+**Do not use `tags=service.name=...&limit=1` to find your trace.** It returns the newest trace from that service, which is usually a background trace such as `wolverine_node_assignments` or `rabbitmq connect`, not your request. That is why the trace id appears to change every time you run it.
+
+**Why the id changes:** every HTTP request creates a new trace id. Running the create-product command twice produces two traces. If you run the lookup twice within a second and no newer trace has arrived, you can see the same id; that is expected.
+
+**Why Grafana shows several `POST /products` rows with different durations:** each row is a different request. A `1.09 s` row and a `14.5 s` row are two separate calls; the first request after startup is often slower because of JIT, database, and Elasticsearch warm-up. Pick the row whose **Start time** matches the moment you ran `curl`.
 
 ### 8.1 Open the trace in Grafana (Tempo is not a UI)
 
@@ -1222,6 +1237,12 @@ curl -s "http://localhost:3200/api/search?tags=service.name%3Dmyapp.apihost&limi
    - **Span Name:** `POST /products`
 6. Click **Run query**.
 7. Click the trace row that appears. The waterfall view opens.
+
+**How to read the Tempo search table.** Each row is **one trace**, which means one request. `Trace ID` is unique to that request. `Service` is the service that owns the root span (`myapp.apihost` for `POST /products`). `Name` is the root span name. `Duration` is the total time of that request, including its child spans. Click a row to open the waterfall; the spans below the table are the spans inside the selected trace.
+
+If you see several `POST /products` rows, those are separate requests with different durations. Pick the row whose **Start time** matches when you ran the command. A slow first request (`~14s`) followed by a fast one (`~1s`) is normal while the app, database, and search index warm up.
+
+Background traces such as `wolverine_node_assignments` and `rabbitmq connect` are not your request. Filter by **Span Name** to remove them.
 
 If you already have the trace id, use **Query type → TraceQL** and run:
 
@@ -1287,9 +1308,13 @@ curl -s -G "http://localhost:3100/loki/api/v1/query_range" \
   --data-urlencode 'query={service_name="myapp.apihost"}' \
   --data-urlencode 'limit=3' | jq '.data.result | length'
 
-# Tempo is ready and has traces
+# Tempo is ready. To list traces, filter by span name and give a time range:
 curl -s http://localhost:3200/ready
-curl -s "http://localhost:3200/api/search?tags=service.name%3Dmyapp.apihost&limit=3" | jq '.traces'
+START=$(date -u -d '1 hour ago' +%s); END=$(date -u +%s)
+curl -s -G "http://localhost:3200/api/search" \
+  --data-urlencode 'q={ name = "POST /products" }' \
+  --data-urlencode "start=$START" --data-urlencode "end=$END" \
+  --data-urlencode 'limit=3' | jq '.traces'
 
 # Grafana and datasources
 curl -s http://localhost:3000/api/health
@@ -1405,9 +1430,12 @@ curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:5101/products
   -H 'Content-Type: application/json' \
   -d '{"Name":"Cheat Sheet","Category":"Books","Price":9.99,"Stock":1}'
 
-# Trace id
-curl -s "http://localhost:3200/api/search?tags=service.name%3Dmyapp.apihost&limit=1" \
-  | jq -r '.traces[0].traceID'
+# Trace id (filter by span name and give a time range)
+START=$(date -u -d '1 hour ago' +%s); END=$(date -u +%s)
+curl -s -G "http://localhost:3200/api/search" \
+  --data-urlencode 'q={ name = "POST /products" }' \
+  --data-urlencode "start=$START" --data-urlencode "end=$END" \
+  --data-urlencode 'limit=1' | jq -r '.traces[0].traceID'
 ```
 
 ## 14. What this guide does not cover

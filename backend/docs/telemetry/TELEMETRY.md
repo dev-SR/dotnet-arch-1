@@ -2232,8 +2232,12 @@ curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:5101/products
 ### 17.3 Verify signals arrive
 
 ```bash
-# Traces in Tempo?
-curl -s "http://localhost:3200/api/search?tags=service.name=myapp.apihost&limit=5" | jq
+# Traces in Tempo? Filter by span name and give a time range.
+START=$(date -u -d '1 hour ago' +%s); END=$(date -u +%s)
+curl -s -G "http://localhost:3200/api/search" \
+  --data-urlencode 'q={ name = "POST /products" }' \
+  --data-urlencode "start=$START" --data-urlencode "end=$END" \
+  --data-urlencode 'limit=5' | jq
 
 # Metrics in Prometheus?
 curl -s "http://localhost:9090/api/v1/query?query=http_server_request_duration_seconds_count" | jq '.data.result | length'
@@ -2514,14 +2518,17 @@ curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:5101/products
   -H 'Content-Type: application/json' \
   -d '{"Name":"Correlation Check","Category":"Books","Price":12.34,"Stock":1}'
 
-# Find the trace in Tempo
-curl -s "http://localhost:3200/api/search?q=%7Bresource.service.name%3D%22myapp.apihost%22%7D&limit=1" \
-  | jq -r '.traces[0].traceID'
+# Find the trace in Tempo. Filter by span name and give a time range;
+# a bare service filter returns the newest trace, which may be a background one.
+START=$(date -u -d '1 hour ago' +%s); END=$(date -u +%s)
+TRACE_ID=$(curl -s -G "http://localhost:3200/api/search" \
+  --data-urlencode 'q={ name = "POST /products" }' \
+  --data-urlencode "start=$START" --data-urlencode "end=$END" \
+  --data-urlencode 'limit=1' | jq -r '.traces[0].traceID')
 
-# Now grep Loki for that trace_id
-TRACE_ID=<paste>
+# Now query Loki for that trace_id
 curl -s -G "http://localhost:3100/loki/api/v1/query_range" \
-  --data-urlencode "query={service_name=\"myapp.apihost\"} | json | trace_id=\"$TRACE_ID\"" \
+  --data-urlencode "query={service_name=\"myapp.apihost\"} | trace_id=\"$TRACE_ID\"" \
   | jq '.data.result | length'   # should be > 0
 ```
 
