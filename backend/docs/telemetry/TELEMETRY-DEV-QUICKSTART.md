@@ -1330,39 +1330,31 @@ If the result is empty, generate traffic first (§8), then set the time range in
 
 1. Stay in **Explore**.
 2. Open the datasource dropdown and choose **Loki**.
-3. Enter this query:
+3. Set the time range in the top-right corner to **Last 15 minutes**. Prefer a relative range; an absolute range that is in the future or before your request will show no logs.
+4. Enter this query:
 
    ```logql
    {service_name="myapp.apihost"}
    ```
 
-4. Click **Run query**.
-5. If the result shows a table, switch the view selector to **Logs**.
-6. You should see request log lines. Expand one line and look for the `trace_id` field.
+   Use the underscore label `service_name`, not `service.name`. Loki labels use the sanitized form.
 
-If there are no logs, confirm the collector is running and that the time range covers your request.
+5. Click **Run query**.
+6. If the result shows a table, switch the view selector to **Logs**.
+7. You should see request log lines. Expand one line and look for the `trace_id` field.
 
-**If Grafana says “No logs volume available” or “No volume information available”,** that message is about the small histogram above the logs, not about the log lines themselves. Do this:
+**“No logs volume available” is not an error.** It only means Grafana cannot draw the small histogram above the results. The logs themselves can still be present; look at the **Logs** panel below it.
 
-1. Set the time range in the top-right corner to **Last 1 hour** (or **Last 6 hours**).
-2. Click **Run query** again.
-3. Look at the **Logs** result tab, not the volume panel.
+If the panel says **“No logs found”**, check in this order:
 
-If the Logs tab is still empty, widen the query to prove Loki has anything:
-
-```logql
-{service_name=~".+"}
-```
-
-Then narrow it back to `{service_name="myapp.apihost"}`. You can also check the labels directly:
-
-```bash
-curl -s http://localhost:3100/loki/api/v1/label/service_name/values | jq -r '.data[]'
-```
-
-You should see `myapp.apihost`, `myapp.ordersapi`, `myapp.invoicesapi`, and `myapp.shippingapi`.
-
-If the volume histogram is distracting, set **Logs volume** to **None** in the Loki query options. The log lines still work.
+1. Set the time range to **Last 15 minutes** and run the query again.
+2. Confirm the label and value:
+   ```bash
+   curl -s http://localhost:3100/loki/api/v1/label/service_name/values | jq -r '.data[]'
+   ```
+   You should see `myapp.apihost`, `myapp.ordersapi`, `myapp.invoicesapi`, and `myapp.shippingapi`.
+3. Generate traffic again (§8) and re-run the query.
+4. If the label list is empty, check `docker compose -f docker-compose.dev.yml logs otel-collector --tail 30` and confirm Loki is running.
 
 #### E. Check traces
 
@@ -1497,6 +1489,8 @@ curl -s -G "http://localhost:3100/loki/api/v1/query_range" \
 | Consumer trace missing | The consumer service is not running | Start OrdersApi/InvoicesApi/ShippingApi; check `/health`. |
 | `ErrorOr` failures are green | Handler span is not the HTTP span | Expected. The behavior marks the handler span red; the HTTP status is unchanged. |
 | Integration tests time out on messaging | Manually started hosts hold the RabbitMQ queue consumers | Stop the `dotnet run` hosts before `dotnet test tests/YourApp.Tests.Integration`. |
+| Loki says “No logs found” | Time range is future/past, or the label is wrong | Use **Last 15 minutes** and `{service_name="myapp.apihost"}` |
+| Loki says “No logs volume available” | Loki cannot build the histogram in this setup | Ignore it; the **Logs** panel below still works |
 
 ---
 
