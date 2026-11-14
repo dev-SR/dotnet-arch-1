@@ -82,6 +82,18 @@ These are the custom counters from the application, not generic HTTP metrics.
 
 The bottom panel shows Loki logs for the selected service. Expand a line to see structured fields, including `trace_id`. Use the time range and service variable to narrow it down.
 
+### Alerts
+
+The bottom of the Service Overview has two alert panels:
+
+**Firing alerts** shows the number of currently firing Prometheus alerts. It is `0` when nothing is firing.
+
+**Active alerts** lists the firing alerts with their labels (`alertname`, `severity`, `service_name`).
+
+These panels read the Prometheus `ALERTS` series. They are **not** Grafana-managed alerts. The rules live in `prometheus-rules.yml` and are evaluated by Prometheus. Grafana only displays their state.
+
+This is intentional: it keeps one source of truth. If you created the same rule again in Grafana Alerting, you would have two alert definitions and two places to maintain.
+
 ---
 
 ## 4. MyApp — Traces & Messaging

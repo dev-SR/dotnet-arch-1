@@ -1583,6 +1583,10 @@ The alert resolves automatically after the error rate drops below the threshold 
 
 Grafana dashboards are not alerts. The error panels show you the symptom; the Prometheus rule decides when to notify.
 
+**See alerts in the dashboard:** the **Service Overview** dashboard has **Firing alerts** and **Active alerts** panels at the bottom. They read Prometheus’s `ALERTS` series, so they show the same firing alerts without duplicating the rules in Grafana.
+
+Grafana’s **Alert list** panel is for Grafana-managed alert rules, not external Prometheus rules. That is why the dashboards use `ALERTS` instead: Prometheus remains the single source of truth.
+
 ---
 
 ## 10. Grafana tour
